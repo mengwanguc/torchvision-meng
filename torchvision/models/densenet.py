@@ -1,3 +1,4 @@
+import time
 import re
 import torch
 import torch.nn as nn
@@ -78,6 +79,7 @@ class _DenseLayer(nn.Module):
     # torchscript does not yet support *args, so we overload method
     # allowing it to take either a List[Tensor] or single Tensor
     def forward(self, input: Tensor) -> Tensor:  # noqa: F811
+        end = time.time()
         if isinstance(input, Tensor):
             prev_features = [input]
         else:
@@ -95,6 +97,8 @@ class _DenseLayer(nn.Module):
         if self.drop_rate > 0:
             new_features = F.dropout(new_features, p=self.drop_rate,
                                      training=self.training)
+        single_forward_time = time.time() - end
+        print("densenet single_forward_time: {}".format(single_forward_time))
         return new_features
 
 

@@ -1,3 +1,4 @@
+import time
 import torch
 from torch import Tensor
 import torch.nn as nn
@@ -246,7 +247,12 @@ class ResNet(nn.Module):
         return x
 
     def forward(self, x: Tensor) -> Tensor:
-        return self._forward_impl(x)
+        end = time.time()
+        res = self._forward_impl(x)
+        single_forward_time = time.time() - end
+        print("single forward time: {}".format(single_forward_time))
+#        return self._forward_impl(x)
+        return res
 
 
 def _resnet(

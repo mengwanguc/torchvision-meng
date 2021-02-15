@@ -1,3 +1,4 @@
+import time
 import torch
 import torch.nn as nn
 import torch.nn.init as init
@@ -107,10 +108,13 @@ class SqueezeNet(nn.Module):
                     init.constant_(m.bias, 0)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        end = time.time()
         x = self.features(x)
         x = self.classifier(x)
-        return torch.flatten(x, 1)
-
+        res = torch.flatten(x, 1)
+        single_forward_time = time.time() - end
+        print("squeezenet single_forward_time: {}".format(single_forward_time))
+        return res
 
 def _squeezenet(version: str, pretrained: bool, progress: bool, **kwargs: Any) -> SqueezeNet:
     model = SqueezeNet(version, **kwargs)

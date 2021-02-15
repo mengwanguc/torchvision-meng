@@ -1,3 +1,4 @@
+import pickle
 from .vision import VisionDataset
 
 from PIL import Image
@@ -5,6 +6,7 @@ from PIL import Image
 import os
 import os.path
 from typing import Any, Callable, cast, Dict, List, Optional, Tuple
+import time
 
 
 def has_file_allowed_extension(filename: str, extensions: Tuple[str, ...]) -> bool:
@@ -174,8 +176,24 @@ class DatasetFolder(VisionDataset):
         Returns:
             tuple: (sample, target) where target is class_index of the target class.
         """
+        if self.is_meng:
+            path, target = self.samples[index]
+            end = time.time()
+            samples = meng_loader(path)
+            load_time = time.time() - end
+            print('load 4 images in a file time:{}'.format(load_time))
+            if self.transform is not None:
+                samples = [self.transform(sample) for sample in samples]
+            if self.target_transform is not None:
+                target = self.target_transform(target)
+            res = samples, target
+            print(res)
+            return res
         path, target = self.samples[index]
+        end = time.time()
         sample = self.loader(path)
+        load_time = time.time() - end
+        print("load one image time: {}".format(load_time))
         if self.transform is not None:
             sample = self.transform(sample)
         if self.target_transform is not None:
@@ -187,14 +205,22 @@ class DatasetFolder(VisionDataset):
         return len(self.samples)
 
 
-IMG_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.ppm', '.bmp', '.pgm', '.tif', '.tiff', '.webp')
+IMG_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.ppm', '.bmp', '.pgm', '.tif', '.tiff', '.webp', '.pickle')
 
 
 def pil_loader(path: str) -> Image.Image:
     # open path as file to avoid ResourceWarning (https://github.com/python-pillow/Pillow/issues/835)
     with open(path, 'rb') as f:
+#        end = time.time()
         img = Image.open(f)
+ #       pil_img_open_time = time.time() - end
+  #      print("pil_img_open_time: {}".format(pil_img_open_time))
         return img.convert('RGB')
+
+def meng_loader(path: str) -> [Image.Image]:
+    with open(path, 'rb') as f:
+        imgs = pickle.load(f)
+        return imgs
 
 
 # TODO: specify the return type
@@ -249,9 +275,44 @@ class ImageFolder(DatasetFolder):
             target_transform: Optional[Callable] = None,
             loader: Callable[[str], Any] = default_loader,
             is_valid_file: Optional[Callable[[str], bool]] = None,
+            is_meng: bool = False
     ):
         super(ImageFolder, self).__init__(root, loader, IMG_EXTENSIONS if is_valid_file is None else None,
                                           transform=transform,
                                           target_transform=target_transform,
                                           is_valid_file=is_valid_file)
         self.imgs = self.samples
+        self.is_meng = is_meng
+        if(is_meng):
+            print("meng's image folder!")
+
+"""
+class MengImageFolder(DatasetFolder):
+    def __init__(
+            self,
+            root: str,
+            transform: Optional[Callable] = None,
+            target_transform: Optional[Callable] = None,
+            loader: Callable[[str], Any] = default_loader,
+            is_valid_file: Optional[Callable[[str], bool]] = None,
+    ):
+        super(MengImageFolder, self).__init__(root, loader, IMG_EXTENSIONS if is_valid_file is None else None,
+                                          transform=transform,
+                                          target_transform=target_transform,
+                                          is_valid_file=is_valid_file)
+        self.imgs = self.samples
+"""
+
+"""
+    def __getitem__(self, index: int) -> Tuple[Any, Any]:
+        path, target = self.samples[index]
+        samples = mengloader(path)
+        if self.transform is not None:
+            samples = [self.transform(sample) for sample in samples]
+        if self.target_transform is not None:
+            target = self.target_transform(target)
+        res = samples, target
+        print(res)
+        return res
+
+"""

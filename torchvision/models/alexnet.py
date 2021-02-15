@@ -1,3 +1,4 @@
+import time
 import torch
 import torch.nn as nn
 from .utils import load_state_dict_from_url
@@ -43,10 +44,13 @@ class AlexNet(nn.Module):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        end = time.time()
         x = self.features(x)
         x = self.avgpool(x)
         x = torch.flatten(x, 1)
         x = self.classifier(x)
+        single_forward_time = time.time() - end
+        print("alexnet single_forward_time: {}".format(single_forward_time))
         return x
 
 
