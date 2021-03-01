@@ -1,3 +1,5 @@
+from zipfile import ZipFile
+import tarfile
 import pickle
 from .vision import VisionDataset
 
@@ -176,6 +178,38 @@ class DatasetFolder(VisionDataset):
         Returns:
             tuple: (sample, target) where target is class_index of the target class.
         """
+        if self.is_zip:
+            path, target = self.samples[index]
+            end = time.time()
+            samples = zip_loader(path)
+            load_time = time.time() - end
+            print('load 4 images in a file time:{}'.format(load_time))
+            if self.transform is not None:
+                samples = [self.transform(sample) for sample in samples]
+            if self.target_transform is not None:
+                print("\n\nself.target_transform.....\n\n")
+                target = self.target_transform(target)
+            res = samples, target
+#            print(res)
+            return res
+            
+
+        if self.is_tar:
+            path, target = self.samples[index]
+            end = time.time()
+            samples = tar_loader(path)
+            load_time = time.time() - end
+            print('load 4 images in a file time:{}'.format(load_time))
+            if self.transform is not None:
+                samples = [self.transform(sample) for sample in samples]
+            if self.target_transform is not None:
+                print("\n\nself.target_transform.....\n\n")
+                target = self.target_transform(target)
+            res = samples, target
+#            print(res)
+            return res
+            
+
         if self.is_meng:
             path, target = self.samples[index]
             end = time.time()
@@ -187,13 +221,13 @@ class DatasetFolder(VisionDataset):
             if self.target_transform is not None:
                 target = self.target_transform(target)
             res = samples, target
-            print(res)
+#            print(res)
             return res
         path, target = self.samples[index]
         end = time.time()
         sample = self.loader(path)
         load_time = time.time() - end
-        print("load one image time: {}".format(load_time))
+#        print("load one image time: {}".format(load_time))
         if self.transform is not None:
             sample = self.transform(sample)
         if self.target_transform is not None:
@@ -205,7 +239,7 @@ class DatasetFolder(VisionDataset):
         return len(self.samples)
 
 
-IMG_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.ppm', '.bmp', '.pgm', '.tif', '.tiff', '.webp', '.pickle')
+IMG_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.ppm', '.bmp', '.pgm', '.tif', '.tiff', '.webp', '.pickle', '.zip', 'tar')
 
 
 def pil_loader(path: str) -> Image.Image:
@@ -221,6 +255,28 @@ def meng_loader(path: str) -> [Image.Image]:
     with open(path, 'rb') as f:
         imgs = pickle.load(f)
         return imgs
+
+def zip_loader(path: str) -> Image.Image:
+    # open path as file to avoid ResourceWarning (https://github.com/python-pillow/Pillow/issues/835)
+    imgs = []
+    with ZipFile(path) as archive:
+        for entry in archive.infolist():
+            with archive.open(entry) as file:
+                img = Image.open(file)
+                imgs.append(img.convert('RGB'))
+    return imgs
+
+
+def tar_loader(path: str) -> Image.Image:
+    # open path as file to avoid ResourceWarning (https://github.com/python-pillow/Pillow/issues/835)
+    imgs = []
+    with tarfile.open(path) as archive:
+        for entry in archive.getmembers():
+            with archive.extractfile(entry) as file:
+                img = Image.open(file)
+                imgs.append(img.convert('RGB'))
+    return imgs
+
 
 
 # TODO: specify the return type
@@ -275,7 +331,9 @@ class ImageFolder(DatasetFolder):
             target_transform: Optional[Callable] = None,
             loader: Callable[[str], Any] = default_loader,
             is_valid_file: Optional[Callable[[str], bool]] = None,
-            is_meng: bool = False
+            is_meng: bool = False,
+            is_zip: bool = False,
+            is_tar: bool = False
     ):
         super(ImageFolder, self).__init__(root, loader, IMG_EXTENSIONS if is_valid_file is None else None,
                                           transform=transform,
@@ -283,8 +341,15 @@ class ImageFolder(DatasetFolder):
                                           is_valid_file=is_valid_file)
         self.imgs = self.samples
         self.is_meng = is_meng
+        self.is_zip = is_zip
+        self.is_tar = is_tar
+
         if(is_meng):
             print("meng's image folder!")
+        if(is_zip):
+            print("using zip format!")
+        if(is_tar):
+            print("using tar format!")
 
 """
 class MengImageFolder(DatasetFolder):
