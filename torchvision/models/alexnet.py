@@ -50,7 +50,7 @@ class AlexNet(nn.Module):
         x = torch.flatten(x, 1)
         x = self.classifier(x)
         single_forward_time = time.time() - end
-        print("alexnet single_forward_time: {}".format(single_forward_time))
+       # print("alexnet single_forward_time: {}".format(single_forward_time))
         return x
 
 

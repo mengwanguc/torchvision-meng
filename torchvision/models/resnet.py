@@ -247,10 +247,10 @@ class ResNet(nn.Module):
         return x
 
     def forward(self, x: Tensor) -> Tensor:
-        end = time.time()
+#        end = time.time()
         res = self._forward_impl(x)
-        single_forward_time = time.time() - end
-        print("single forward time: {}".format(single_forward_time))
+#        single_forward_time = time.time() - end
+#        print("single forward time: {}".format(single_forward_time))
 #        return self._forward_impl(x)
         return res
 

@@ -183,7 +183,7 @@ class DatasetFolder(VisionDataset):
             end = time.time()
             samples = zip_loader(path)
             load_time = time.time() - end
-            print('load 4 images in a file time:{}'.format(load_time))
+#            print('load 4 images in a file time:{}'.format(load_time))
             if self.transform is not None:
                 samples = [self.transform(sample) for sample in samples]
             if self.target_transform is not None:
@@ -199,7 +199,7 @@ class DatasetFolder(VisionDataset):
             end = time.time()
             samples = tar_loader(path)
             load_time = time.time() - end
-            print('load 4 images in a file time:{}'.format(load_time))
+          #  print('load 4 images in a file time:{}'.format(load_time))
             if self.transform is not None:
                 samples = [self.transform(sample) for sample in samples]
             if self.target_transform is not None:
