@@ -3,6 +3,7 @@ from .vision import VisionDataset
 from PIL import Image
 
 import os
+import time
 import os.path
 from typing import Any, Callable, cast, Dict, List, Optional, Tuple
 
@@ -138,6 +139,7 @@ class DatasetFolder(VisionDataset):
         self.class_to_idx = class_to_idx
         self.samples = samples
         self.targets = [s[1] for s in samples]
+        self.numcount = 0
 
     @staticmethod
     def make_dataset(
@@ -174,12 +176,18 @@ class DatasetFolder(VisionDataset):
         Returns:
             tuple: (sample, target) where target is class_index of the target class.
         """
+  #      self.numcount += 1
+   #     print(self.numcount)
         path, target = self.samples[index]
         sample = self.loader(path)
+        end = time.time()
         if self.transform is not None:
             sample = self.transform(sample)
         if self.target_transform is not None:
             target = self.target_transform(target)
+
+        transform_time = time.time() - end
+    #    print(transform_time)
 
         return sample, target
 
