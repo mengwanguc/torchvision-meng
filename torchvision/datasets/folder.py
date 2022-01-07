@@ -229,7 +229,10 @@ class DatasetFolder(VisionDataset):
         load_time = time.time() - end
 #        print("load one image time: {}".format(load_time))
         if self.transform is not None:
+            end = time.time()
             sample = self.transform(sample)
+            transform_time = time.time() - end
+            print("    transform one image time: {}".format(transform_time))
         if self.target_transform is not None:
             target = self.target_transform(target)
 
@@ -245,10 +248,10 @@ IMG_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.ppm', '.bmp', '.pgm', '.tif', '.tif
 def pil_loader(path: str) -> Image.Image:
     # open path as file to avoid ResourceWarning (https://github.com/python-pillow/Pillow/issues/835)
     with open(path, 'rb') as f:
-#        end = time.time()
+        end = time.time()
         img = Image.open(f)
- #       pil_img_open_time = time.time() - end
-  #      print("pil_img_open_time: {}".format(pil_img_open_time))
+        pil_img_open_time = time.time() - end
+        print("    pil_img_open_time: {}".format(pil_img_open_time))
         return img.convert('RGB')
 
 def meng_loader(path: str) -> [Image.Image]:
