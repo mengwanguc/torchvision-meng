@@ -230,7 +230,7 @@ class DatasetFolder(VisionDataset):
 #        print("load one image time: {}".format(load_time))
         if self.transform is not None:
             end = time.time()
-            sample = self.transform(sample)
+#            sample = self.transform(sample)
             transform_time = time.time() - end
             print("    transform one image time: {}".format(transform_time))
         if self.target_transform is not None:
