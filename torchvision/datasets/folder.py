@@ -332,7 +332,7 @@ def pil_loader(path: str) -> Image.Image:
         print("    io_read_time: {}  pil_img_decode_time: {}".format(io_read_time, pil_img_decode_time))
         return res
 
- async def pil_loader(path: str) -> Image.Image:
+async def pil_loader(path: str) -> Image.Image:
     # open path as file to avoid ResourceWarning (https://github.com/python-pillow/Pillow/issues/835)
     end = time.time()
     async with aiofiles.open(path, 'rb') as f:
