@@ -1,3 +1,7 @@
+import aiofiles
+import asyncio
+import io
+
 from zipfile import ZipFile
 import tarfile
 import pickle
@@ -230,7 +234,7 @@ class DatasetFolder(VisionDataset):
 #        print("load one image time: {}".format(load_time))
         if self.transform is not None:
             end = time.time()
-#            sample = self.transform(sample)
+            sample = self.transform(sample)
             transform_time = time.time() - end
             print("    transform one image time: {}".format(transform_time))
         if self.target_transform is not None:
@@ -242,18 +246,108 @@ class DatasetFolder(VisionDataset):
         return len(self.samples)
 
 
+    async def async_get_item(self, index: int) -> Tuple[Any, Any]:
+        """
+        Args:
+            index (int): Index
+
+        Returns:
+            tuple: (sample, target) where target is class_index of the target class.
+        """
+        if self.is_zip:
+            path, target = self.samples[index]
+            end = time.time()
+            samples = zip_loader(path)
+            load_time = time.time() - end
+#            print('load 4 images in a file time:{}'.format(load_time))
+            if self.transform is not None:
+                samples = [self.transform(sample) for sample in samples]
+            if self.target_transform is not None:
+                print("\n\nself.target_transform.....\n\n")
+                target = self.target_transform(target)
+            res = samples, target
+#            print(res)
+            return res
+            
+
+        if self.is_tar:
+            path, target = self.samples[index]
+            end = time.time()
+            samples = await async_tar_loader(path)
+            load_time = time.time() - end
+          #  print('load 4 images in a file time:{}'.format(load_time))
+            if self.transform is not None:
+                samples = [self.transform(sample) for sample in samples]
+            if self.target_transform is not None:
+                print("\n\nself.target_transform.....\n\n")
+                target = self.target_transform(target)
+            res = samples, target
+#            print(res)
+            return res
+            
+
+        if self.is_meng:
+            path, target = self.samples[index]
+            end = time.time()
+            samples = meng_loader(path)
+            load_time = time.time() - end
+            print('load 4 images in a file time:{}'.format(load_time))
+            if self.transform is not None:
+                samples = [self.transform(sample) for sample in samples]
+            if self.target_transform is not None:
+                target = self.target_transform(target)
+            res = samples, target
+#            print(res)
+            return res
+        path, target = self.samples[index]
+        end = time.time()
+        sample = await async_pil_loader(path)
+        load_time = time.time() - end
+#        print("load one image time: {}".format(load_time))
+        if self.transform is not None:
+            end = time.time()
+            sample = self.transform(sample)
+            transform_time = time.time() - end
+            print("    transform one image time: {}".format(transform_time))
+        if self.target_transform is not None:
+            target = self.target_transform(target)
+
+        return sample, target
+
+    
 IMG_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.ppm', '.bmp', '.pgm', '.tif', '.tiff', '.webp', '.pickle', '.zip', 'tar')
 
 
 def pil_loader(path: str) -> Image.Image:
     # open path as file to avoid ResourceWarning (https://github.com/python-pillow/Pillow/issues/835)
+    end = time.time()
     with open(path, 'rb') as f:
+        f = f.read()
+        f = io.BytesIO(f)
+        io_read_time = time.time() - end
         end = time.time()
         img = Image.open(f)
-        pil_img_open_time = time.time() - end
-        print("    pil_img_open_time: {}".format(pil_img_open_time))
-        return img.convert('RGB')
+        res = img.convert('RGB')
+        pil_img_decode_time = time.time() - end
+        print("    io_read_time: {}  pil_img_decode_time: {}".format(io_read_time, pil_img_decode_time))
+        return res
 
+ async def pil_loader(path: str) -> Image.Image:
+    # open path as file to avoid ResourceWarning (https://github.com/python-pillow/Pillow/issues/835)
+    end = time.time()
+    async with aiofiles.open(path, 'rb') as f:
+        f = await f.read()
+        f = io.BytesIO(f)
+        io_read_time = time.time() - end
+        end = time.time()
+        img = Image.open(f)
+        res = img.convert('RGB')
+        pil_img_decode_time = time.time() - end
+        print("    io_read_time: {}  pil_img_decode_time: {}".format(io_read_time, pil_img_decode_time))
+        return res
+    
+    
+ 
 def meng_loader(path: str) -> [Image.Image]:
     with open(path, 'rb') as f:
         imgs = pickle.load(f)
@@ -273,13 +367,57 @@ def zip_loader(path: str) -> Image.Image:
 def tar_loader(path: str) -> Image.Image:
     # open path as file to avoid ResourceWarning (https://github.com/python-pillow/Pillow/issues/835)
     imgs = []
+    end = time.time()
+    with open(path, 'rb') as f:
+        f = f.read()
+        iobytes = io.BytesIO(f)
+        tar_read_time = time.time() - end
+        print("    tar_read_time: {}".format(tar_read_time))
+        with tarfile.open(fileobj=iobytes) as archive:
+            for entry in archive.getmembers():
+                end = time.time()
+                with archive.extractfile(entry) as file:
+                    per_img_extract_tile = time.time() - end
+                    end = time.time()
+                    img = Image.open(file)
+                    imgs.append(img.convert('RGB'))
+                    pil_img_decode_time = time.time() - end
+                    print("        per_img_extract_tile: {}  pil_img_decode_time: {}".format(per_img_extract_tile, pil_img_decode_time))
+    return imgs
+
+
+async def async_tar_loader(path: str) -> Image.Image:
+    # open path as file to avoid ResourceWarning (https://github.com/python-pillow/Pillow/issues/835)
+    imgs = []
+    end = time.time()
+    async with open(path, 'rb') as f:
+        f = await f.read()
+        iobytes = io.BytesIO(f)
+        tar_read_time = time.time() - end
+        print("    tar_read_time: {}".format(tar_read_time))
+        with tarfile.open(fileobj=iobytes) as archive:
+            for entry in archive.getmembers():
+                end = time.time()
+                with archive.extractfile(entry) as file:
+                    per_img_extract_tile = time.time() - end
+                    end = time.time()
+                    img = Image.open(file)
+                    imgs.append(img.convert('RGB'))
+                    pil_img_decode_time = time.time() - end
+                    print("        per_img_extract_tile: {}  pil_img_decode_time: {}".format(per_img_extract_tile, pil_img_decode_time))
+    return imgs
+
+
+
+def tar_loader(path: str) -> Image.Image:
+    # open path as file to avoid ResourceWarning (https://github.com/python-pillow/Pillow/issues/835)
+    imgs = []
     with tarfile.open(path) as archive:
         for entry in archive.getmembers():
             with archive.extractfile(entry) as file:
                 img = Image.open(file)
                 imgs.append(img.convert('RGB'))
     return imgs
-
 
 
 # TODO: specify the return type
