@@ -390,7 +390,7 @@ async def async_tar_loader(path: str) -> Image.Image:
     # open path as file to avoid ResourceWarning (https://github.com/python-pillow/Pillow/issues/835)
     imgs = []
     end = time.time()
-    async with open(path, 'rb') as f:
+    async with aiofiles.open(path, 'rb') as f:
         f = await f.read()
         iobytes = io.BytesIO(f)
         tar_read_time = time.time() - end
