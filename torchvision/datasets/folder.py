@@ -318,6 +318,23 @@ class DatasetFolder(VisionDataset):
 #            print(res)
             return res
             
+        if self.is_tar:
+            path = self.root + '/train/' + self.metadata[index]['groupname']
+            group_metadata = self.metadata[index]['metadata']
+            target = 0
+            end = time.time()
+            samples = await async_mytar_loader(path, group_metadata)
+            load_time = time.time() - end
+          #  print('load 4 images in a file time:{}'.format(load_time))
+            if self.transform is not None:
+                samples = [self.transform(sample) for sample in samples]
+            if self.target_transform is not None:
+                print("\n\nself.target_transform.....\n\n")
+                target = self.target_transform(target)
+            res = samples, target
+#            print(res)
+            return res
+
 
         if self.is_tar:
             path, target = self.samples[index]
@@ -444,7 +461,7 @@ def mytar_loader(path: str, group_metadata):
         f = f.read()
         tar_read_time = time.time() - end
         print("    tar_read_time: {}".format(tar_read_time))
-        print("size of f:{}  last offset:{}".format(len(f), group_metadata[-1]['start'] + group_metadata[-1]['img_size']))
+ #       print("size of f:{}  last offset:{}".format(len(f), group_metadata[-1]['start'] + group_metadata[-1]['img_size']))
         for img_info in group_metadata:
                 end = time.time()
                 img_start = img_info['start']
@@ -485,6 +502,30 @@ async def async_tar_loader(path: str) -> Image.Image:
                     print("        per_img_extract_tile: {}  pil_img_decode_time: {}".format(per_img_extract_tile, pil_img_decode_time))
     return imgs
 
+
+async def async_mytar_loader(path: str, group_metadata):
+    imgs = []
+    end = time.time()
+    async with aiofiles.open(path, 'rb') as f:
+        f = await f.read()
+        tar_read_time = time.time() - end
+        print("    tar_read_time: {}".format(tar_read_time))
+#        print("size of f:{}  last offset:{}".format(len(f), group_metadata[-1]['start'] + group_metadata[-1]['img_size']))
+        for img_info in group_metadata:
+                end = time.time()
+                img_start = img_info['start']
+                img_end = img_start + img_info['img_size']
+                img_data = f[img_start:img_end]
+                iobytes = io.BytesIO(img_data)
+
+                per_img_extract_tile = time.time() - end
+                end = time.time()
+                img = Image.open(iobytes)
+                imgs.append(img.convert('RGB'))
+                pil_img_decode_time = time.time() - end
+                print("    start:{} end:{} per_img_extract_tile: {}  pil_img_decode_time: {}".format(
+                          img_start, img_end, per_img_extract_tile, pil_img_decode_time))
+    return imgs
 
 
 def old_tar_loader(path: str) -> Image.Image:
