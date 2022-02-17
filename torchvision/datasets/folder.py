@@ -88,6 +88,33 @@ def make_dataset(
     return instances
 
 
+
+def get_metadata_mytar(
+    directory: str,
+    class_to_idx: Dict[str, int],
+    group_size: int
+):
+    directory = os.path.expanduser(directory)
+    metadata_path = os.path.join(directory, "train/metadata.txt")
+    metadata = []
+    with open(metadata_path, 'r') as reader:
+        while reader:
+            groupname = reader.readline().strip().split(',')[0]
+            if(groupname == ''):
+                break
+            print(groupname)
+            group = []
+            for i in range(group_size):
+                values = reader.readline().strip().split(',')
+                idx = values[0]
+                img_class = values[1]
+                start = int(values[2])
+                img_size = int(values[3])
+                group.append({'idx':idx, 'img_class':img_class, 'start':start, 'img_size':img_size})
+            metadata.append({'groupname':groupname, 'metadata':group})
+    return metadata
+
+
 class DatasetFolder(VisionDataset):
     """A generic data loader where the samples are arranged in this way: ::
 
@@ -196,6 +223,24 @@ class DatasetFolder(VisionDataset):
             res = samples, target
 #            print(res)
             return res
+
+
+        if self.is_mytar:
+            path = self.root + '/train/' + self.metadata[index]['groupname']
+            group_metadata = self.metadata[index]['metadata']
+            target = 0
+            end = time.time()
+            samples = mytar_loader(path, group_metadata)
+            load_time = time.time() - end
+          #  print('load 4 images in a file time:{}'.format(load_time))
+            if self.transform is not None:
+                samples = [self.transform(sample) for sample in samples]
+            if self.target_transform is not None:
+                print("\n\nself.target_transform.....\n\n")
+                target = self.target_transform(target)
+            res = samples, target
+#            print(res)
+            return res
             
 
         if self.is_tar:
@@ -243,7 +288,11 @@ class DatasetFolder(VisionDataset):
         return sample, target
 
     def __len__(self) -> int:
-        return len(self.samples)
+        print("!!!!!!!!!!!!!!!calling len for folder")
+        if self.is_mytar:
+            return len(self.metadata)
+        else:
+            return len(self.samples)
 
 
     async def async_get_item(self, index: int) -> Tuple[Any, Any]:
@@ -315,7 +364,8 @@ class DatasetFolder(VisionDataset):
         return sample, target
 
     
-IMG_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.ppm', '.bmp', '.pgm', '.tif', '.tiff', '.webp', '.pickle', '.zip', 'tar')
+IMG_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.ppm', '.bmp', '.pgm', '.tif',
+                  '.tiff', '.webp', '.pickle', '.zip', 'tar', 'mytar')
 
 
 def pil_loader(path: str) -> Image.Image:
@@ -386,6 +436,34 @@ def tar_loader(path: str) -> Image.Image:
     return imgs
 
 
+
+def mytar_loader(path: str, group_metadata):
+    imgs = []
+    end = time.time()
+    with open(path, 'rb') as f:
+        f = f.read()
+        tar_read_time = time.time() - end
+        print("    tar_read_time: {}".format(tar_read_time))
+        print("size of f:{}  last offset:{}".format(len(f), group_metadata[-1]['start'] + group_metadata[-1]['img_size']))
+        for img_info in group_metadata:
+                end = time.time()
+                img_start = img_info['start']
+                img_end = img_start + img_info['img_size']
+                img_data = f[img_start:img_end]
+                iobytes = io.BytesIO(f)
+
+                per_img_extract_tile = time.time() - end
+                end = time.time()
+                img = Image.open(iobytes)
+                imgs.append(img.convert('RGB'))
+                pil_img_decode_time = time.time() - end
+                print("    start:{} end:{} per_img_extract_tile: {}  pil_img_decode_time: {}".format(
+                          img_start, img_end, per_img_extract_tile, pil_img_decode_time))
+    return imgs
+
+
+
+
 async def async_tar_loader(path: str) -> Image.Image:
     # open path as file to avoid ResourceWarning (https://github.com/python-pillow/Pillow/issues/835)
     imgs = []
@@ -409,7 +487,7 @@ async def async_tar_loader(path: str) -> Image.Image:
 
 
 
-def tar_loader(path: str) -> Image.Image:
+def old_tar_loader(path: str) -> Image.Image:
     # open path as file to avoid ResourceWarning (https://github.com/python-pillow/Pillow/issues/835)
     imgs = []
     with tarfile.open(path) as archive:
@@ -474,16 +552,22 @@ class ImageFolder(DatasetFolder):
             is_valid_file: Optional[Callable[[str], bool]] = None,
             is_meng: bool = False,
             is_zip: bool = False,
-            is_tar: bool = False
+            is_async: bool = False,
+            is_tar: bool = False,
+            is_mytar: bool = False,
+            group_size: int = 1,
     ):
         super(ImageFolder, self).__init__(root, loader, IMG_EXTENSIONS if is_valid_file is None else None,
                                           transform=transform,
                                           target_transform=target_transform,
                                           is_valid_file=is_valid_file)
+
         self.imgs = self.samples
         self.is_meng = is_meng
         self.is_zip = is_zip
         self.is_tar = is_tar
+        self.is_async = is_async
+        self.is_mytar = is_mytar
 
         if(is_meng):
             print("meng's image folder!")
@@ -491,6 +575,16 @@ class ImageFolder(DatasetFolder):
             print("using zip format!")
         if(is_tar):
             print("using tar format!")
+        if(is_async):
+            print("loading using async pre-processing!")
+        if(is_tar):
+            print("grouping using my own tar format!")
+
+
+        if self.is_mytar:
+            self.metadata = get_metadata_mytar(root, self.class_to_idx, group_size)
+
+
 
 """
 class MengImageFolder(DatasetFolder):
