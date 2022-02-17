@@ -450,7 +450,7 @@ def mytar_loader(path: str, group_metadata):
                 img_start = img_info['start']
                 img_end = img_start + img_info['img_size']
                 img_data = f[img_start:img_end]
-                iobytes = io.BytesIO(f)
+                iobytes = io.BytesIO(img_data)
 
                 per_img_extract_tile = time.time() - end
                 end = time.time()
