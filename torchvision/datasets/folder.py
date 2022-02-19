@@ -224,6 +224,27 @@ class DatasetFolder(VisionDataset):
 #            print(res)
             return res
 
+        if self.is_mytar and self.read_group_size < self.group_size:
+            rg_count = int(self.group_size / self.read_group_size)
+            group_index = int(index / rg_count)
+            pack_index = index % rg_count
+            path = self.root + '/train/' + self.metadata[group_index]['groupname']
+            group_metadata = self.metadata[group_index]['metadata']
+            target = 0
+            end = time.time()
+            samples = mytar_loader_pack(path, group_metadata, self.read_group_size, pack_index)
+            load_time = time.time() - end
+          #  print('load 4 images in a file time:{}'.format(load_time))
+            if self.transform is not None:
+                samples = [self.transform(sample) for sample in samples]
+            if self.target_transform is not None:
+                print("\n\nself.target_transform.....\n\n")
+                target = self.target_transform(target)
+            res = samples, target
+#            print(res)
+            return res
+
+
 
         if self.is_mytar:
             path = self.root + '/train/' + self.metadata[index]['groupname']
@@ -290,7 +311,7 @@ class DatasetFolder(VisionDataset):
     def __len__(self) -> int:
         print("!!!!!!!!!!!!!!!calling len for folder")
         if self.is_mytar:
-            return len(self.metadata)
+            return len(self.metadata) * int(self.group_size / self.read_group_size)
         else:
             return len(self.samples)
 
@@ -318,7 +339,28 @@ class DatasetFolder(VisionDataset):
 #            print(res)
             return res
             
-        if self.is_tar:
+        if self.is_mytar and self.read_group_size < self.group_size:
+            rg_count = int(self.group_size / self.read_group_size)
+            group_index = int(index / rg_count)
+            pack_index = index % rg_count
+            path = self.root + '/train/' + self.metadata[group_index]['groupname']
+            group_metadata = self.metadata[group_index]['metadata']
+            target = 0
+            end = time.time()
+            samples = await async_mytar_loader_pack(path, group_metadata, self.read_group_size, pack_index)
+            load_time = time.time() - end
+          #  print('load 4 images in a file time:{}'.format(load_time))
+            if self.transform is not None:
+                samples = [self.transform(sample) for sample in samples]
+            if self.target_transform is not None:
+                print("\n\nself.target_transform.....\n\n")
+                target = self.target_transform(target)
+            res = samples, target
+#            print(res)
+            return res
+
+
+        if self.is_mytar:
             path = self.root + '/train/' + self.metadata[index]['groupname']
             group_metadata = self.metadata[index]['metadata']
             target = 0
@@ -478,6 +520,39 @@ def mytar_loader(path: str, group_metadata):
                           img_start, img_end, per_img_extract_tile, pil_img_decode_time))
     return imgs
 
+def mytar_loader_pack(path: str, group_metadata, pack_size, pack_index):
+    imgs = []
+    end = time.time()
+    with open(path, 'rb') as f:
+        pack_start = pack_size * pack_index
+        pack_skip_size = 0
+        pack_read_size = 0
+        for i in range(0, pack_start):
+            pack_skip_size += group_metadata[i]['img_size']
+        for i in range(pack_start, pack_start + pack_size):
+            pack_read_size += group_metadata[i]['img_size']
+        f.seek(pack_skip_size)
+        f = f.read(pack_read_size)
+        tar_read_time = time.time() - end
+        print("    tar_read_time: {}".format(tar_read_time))
+ #       print("size of f:{}  last offset:{}".format(len(f), group_metadata[-1]['start'] + group_metadata[-1]['img_size']))
+        for i in range(pack_start, pack_start + pack_size):
+                img_info = group_metadata[i]
+                end = time.time()
+                img_start = img_info['start'] - pack_skip_size
+                img_end = img_start + img_info['img_size']
+                img_data = f[img_start:img_end]
+                iobytes = io.BytesIO(img_data)
+
+                per_img_extract_tile = time.time() - end
+                end = time.time()
+                img = Image.open(iobytes)
+                imgs.append(img.convert('RGB'))
+                pil_img_decode_time = time.time() - end
+                print("    start:{} end:{} per_img_extract_tile: {}  pil_img_decode_time: {}".format(
+                          img_start, img_end, per_img_extract_tile, pil_img_decode_time))
+    return imgs
+
 
 
 
@@ -525,6 +600,40 @@ async def async_mytar_loader(path: str, group_metadata):
                 pil_img_decode_time = time.time() - end
                 print("    start:{} end:{} per_img_extract_tile: {}  pil_img_decode_time: {}".format(
                           img_start, img_end, per_img_extract_tile, pil_img_decode_time))
+    return imgs
+
+async def async_mytar_loader_pack(path: str, group_metadata, pack_size, pack_index):
+    imgs = []
+    end = time.time()
+    async with aiofiles.open(path, 'rb') as f:
+        pack_start = pack_size * pack_index
+        pack_skip_size = 0
+        pack_read_size = 0
+        for i in range(0, pack_start):
+            pack_skip_size += group_metadata[i]['img_size']
+        for i in range(pack_start, pack_start + pack_size):
+            pack_read_size += group_metadata[i]['img_size']
+        await f.seek(pack_skip_size)
+        f = await f.read(pack_read_size)
+        tar_read_time = time.time() - end
+        print("    tar_read_time: {}".format(tar_read_time))
+ #       print("size of f:{}  last offset:{}".format(len(f), group_metadata[-1]['start'] + group_metadata[-1]['img_size']))
+        for i in range(pack_start, pack_start + pack_size):
+                img_info = group_metadata[i]
+                end = time.time()
+                img_start = img_info['start'] - pack_skip_size
+                img_end = img_start + img_info['img_size']
+                img_data = f[img_start:img_end]
+                iobytes = io.BytesIO(img_data)
+
+                per_img_extract_tile = time.time() - end
+                end = time.time()
+                img = Image.open(iobytes)
+                imgs.append(img.convert('RGB'))
+                pil_img_decode_time = time.time() - end
+                print("    start:{} end:{} per_img_extract_tile: {}  pil_img_decode_time: {}".format(
+                          img_start, img_end, per_img_extract_tile, pil_img_decode_time))
+    print(len(imgs))
     return imgs
 
 
@@ -597,6 +706,7 @@ class ImageFolder(DatasetFolder):
             is_tar: bool = False,
             is_mytar: bool = False,
             group_size: int = 1,
+            read_group_size: int = 0,
     ):
         super(ImageFolder, self).__init__(root, loader, IMG_EXTENSIONS if is_valid_file is None else None,
                                           transform=transform,
@@ -607,8 +717,13 @@ class ImageFolder(DatasetFolder):
         self.is_meng = is_meng
         self.is_zip = is_zip
         self.is_tar = is_tar
-        self.is_async = is_async
         self.is_mytar = is_mytar
+        self.is_async = is_async
+        self.group_size = group_size
+        if read_group_size == 0:
+            self.read_group_size = group_size
+        else:
+            self.read_group_size = read_group_size
 
         if(is_meng):
             print("meng's image folder!")
@@ -618,7 +733,7 @@ class ImageFolder(DatasetFolder):
             print("using tar format!")
         if(is_async):
             print("loading using async pre-processing!")
-        if(is_tar):
+        if(is_mytar):
             print("grouping using my own tar format!")
 
 
