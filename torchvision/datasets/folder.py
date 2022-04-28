@@ -491,7 +491,7 @@ def tar_loader(path: str) -> Image.Image:
                     img = Image.open(file)
                     imgs.append(img.convert('RGB'))
                     pil_img_decode_time = time.time() - end
-                    print("        per_img_extract_tile: {}  pil_img_decode_time: {}".format(per_img_extract_tile, pil_img_decode_time))
+                    #print("        per_img_extract_tile: {}  pil_img_decode_time: {}".format(per_img_extract_tile, pil_img_decode_time))
     return imgs
 
 
@@ -516,8 +516,8 @@ def mytar_loader(path: str, group_metadata):
                 img = Image.open(iobytes)
                 imgs.append(img.convert('RGB'))
                 pil_img_decode_time = time.time() - end
-                print("    start:{} end:{} per_img_extract_tile: {}  pil_img_decode_time: {}".format(
-                          img_start, img_end, per_img_extract_tile, pil_img_decode_time))
+                #print("    start:{} end:{} per_img_extract_tile: {}  pil_img_decode_time: {}".format(
+                 #         img_start, img_end, per_img_extract_tile, pil_img_decode_time))
     return imgs
 
 def mytar_loader_pack(path: str, group_metadata, pack_size, pack_index):
@@ -549,8 +549,8 @@ def mytar_loader_pack(path: str, group_metadata, pack_size, pack_index):
                 img = Image.open(iobytes)
                 imgs.append(img.convert('RGB'))
                 pil_img_decode_time = time.time() - end
-                print("    start:{} end:{} per_img_extract_tile: {}  pil_img_decode_time: {}".format(
-                          img_start, img_end, per_img_extract_tile, pil_img_decode_time))
+                #print("    start:{} end:{} per_img_extract_tile: {}  pil_img_decode_time: {}".format(
+                 #         img_start, img_end, per_img_extract_tile, pil_img_decode_time))
     return imgs
 
 
@@ -574,7 +574,7 @@ async def async_tar_loader(path: str) -> Image.Image:
                     img = Image.open(file)
                     imgs.append(img.convert('RGB'))
                     pil_img_decode_time = time.time() - end
-                    print("        per_img_extract_tile: {}  pil_img_decode_time: {}".format(per_img_extract_tile, pil_img_decode_time))
+                    #print("        per_img_extract_tile: {}  pil_img_decode_time: {}".format(per_img_extract_tile, pil_img_decode_time))
     return imgs
 
 
@@ -598,8 +598,8 @@ async def async_mytar_loader(path: str, group_metadata):
                 img = Image.open(iobytes)
                 imgs.append(img.convert('RGB'))
                 pil_img_decode_time = time.time() - end
-                print("    start:{} end:{} per_img_extract_tile: {}  pil_img_decode_time: {}".format(
-                          img_start, img_end, per_img_extract_tile, pil_img_decode_time))
+                #print("    start:{} end:{} per_img_extract_tile: {}  pil_img_decode_time: {}".format(
+                 #         img_start, img_end, per_img_extract_tile, pil_img_decode_time))
     return imgs
 
 async def async_mytar_loader_pack(path: str, group_metadata, pack_size, pack_index):
@@ -631,8 +631,8 @@ async def async_mytar_loader_pack(path: str, group_metadata, pack_size, pack_ind
                 img = Image.open(iobytes)
                 imgs.append(img.convert('RGB'))
                 pil_img_decode_time = time.time() - end
-                print("    start:{} end:{} per_img_extract_tile: {}  pil_img_decode_time: {}".format(
-                          img_start, img_end, per_img_extract_tile, pil_img_decode_time))
+                #print("    start:{} end:{} per_img_extract_tile: {}  pil_img_decode_time: {}".format(
+                 #         img_start, img_end, per_img_extract_tile, pil_img_decode_time))
     print(len(imgs))
     return imgs
 
