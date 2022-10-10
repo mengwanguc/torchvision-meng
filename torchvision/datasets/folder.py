@@ -88,7 +88,7 @@ def make_dataset(
     return instances
 
 
-
+# meng: get metadata so we know the classes and index of images.
 def get_metadata_mytar(
     directory: str,
     class_to_idx: Dict[str, int],
@@ -102,7 +102,6 @@ def get_metadata_mytar(
             groupname = reader.readline().strip().split(',')[0]
             if(groupname == ''):
                 break
-            print(groupname)
             group = []
             for i in range(group_size):
                 values = reader.readline().strip().split(',')
@@ -214,14 +213,12 @@ class DatasetFolder(VisionDataset):
             end = time.time()
             samples = zip_loader(path)
             load_time = time.time() - end
-#            print('load 4 images in a file time:{}'.format(load_time))
             if self.transform is not None:
                 samples = [self.transform(sample) for sample in samples]
             if self.target_transform is not None:
                 print("\n\nself.target_transform.....\n\n")
                 target = self.target_transform(target)
             res = samples, target
-#            print(res)
             return res
 
         if self.is_mytar and self.read_group_size < self.group_size:
@@ -241,7 +238,6 @@ class DatasetFolder(VisionDataset):
                 print("\n\nself.target_transform.....\n\n")
                 target = self.target_transform(target)
             res = samples, target
-#            print(res)
             return res
 
 
@@ -502,7 +498,7 @@ def mytar_loader(path: str, group_metadata):
     with open(path, 'rb') as f:
         f = f.read()
         tar_read_time = time.time() - end
-        print("    tar_read_time: {}".format(tar_read_time))
+        # print("    mytar_read_time: {}".format(tar_read_time))
  #       print("size of f:{}  last offset:{}".format(len(f), group_metadata[-1]['start'] + group_metadata[-1]['img_size']))
         for img_info in group_metadata:
                 end = time.time()
@@ -534,7 +530,7 @@ def mytar_loader_pack(path: str, group_metadata, pack_size, pack_index):
         f.seek(pack_skip_size)
         f = f.read(pack_read_size)
         tar_read_time = time.time() - end
-        print("    tar_read_time: {}".format(tar_read_time))
+        print("    mytar_read_time: {}".format(tar_read_time))
  #       print("size of f:{}  last offset:{}".format(len(f), group_metadata[-1]['start'] + group_metadata[-1]['img_size']))
         for i in range(pack_start, pack_start + pack_size):
                 img_info = group_metadata[i]
@@ -564,7 +560,7 @@ async def async_tar_loader(path: str) -> Image.Image:
         f = await f.read()
         iobytes = io.BytesIO(f)
         tar_read_time = time.time() - end
-        print("    tar_read_time: {}".format(tar_read_time))
+        print("    async tar_read_time: {}".format(tar_read_time))
         with tarfile.open(fileobj=iobytes) as archive:
             for entry in archive.getmembers():
                 end = time.time()
@@ -584,7 +580,7 @@ async def async_mytar_loader(path: str, group_metadata):
     async with aiofiles.open(path, 'rb') as f:
         f = await f.read()
         tar_read_time = time.time() - end
-        print("    tar_read_time: {}".format(tar_read_time))
+        print("    async mytar_read_time: {}".format(tar_read_time))
 #        print("size of f:{}  last offset:{}".format(len(f), group_metadata[-1]['start'] + group_metadata[-1]['img_size']))
         for img_info in group_metadata:
                 end = time.time()
@@ -616,7 +612,7 @@ async def async_mytar_loader_pack(path: str, group_metadata, pack_size, pack_ind
         await f.seek(pack_skip_size)
         f = await f.read(pack_read_size)
         tar_read_time = time.time() - end
-        print("    tar_read_time: {}".format(tar_read_time))
+        print("    async mytar pack read_time: {}".format(tar_read_time))
  #       print("size of f:{}  last offset:{}".format(len(f), group_metadata[-1]['start'] + group_metadata[-1]['img_size']))
         for i in range(pack_start, pack_start + pack_size):
                 img_info = group_metadata[i]
