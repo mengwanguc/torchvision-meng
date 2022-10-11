@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 from .utils import load_state_dict_from_url
 from typing import Any
+import traceback
 
 
 __all__ = ['AlexNet', 'alexnet']
@@ -42,15 +43,19 @@ class AlexNet(nn.Module):
             nn.ReLU(inplace=True),
             nn.Linear(4096, num_classes),
         )
+        self.forward_time = 0
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # traceback.print_stack()
         end = time.time()
         x = self.features(x)
         x = self.avgpool(x)
         x = torch.flatten(x, 1)
         x = self.classifier(x)
         single_forward_time = time.time() - end
-       # print("alexnet single_forward_time: {}".format(single_forward_time))
+        self.forward_time += single_forward_time
+        print("alexnet self forward time: {}".format(self.forward_time))
+        # print("alexnet single_forward_time: {}".format(single_forward_time))
         return x
 
 
