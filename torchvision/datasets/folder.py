@@ -91,12 +91,13 @@ def make_dataset(
 # meng: get metadata so we know the classes and index of images.
 def get_metadata_mytar(
     directory: str,
-    class_to_idx: Dict[str, int],
     group_size: int
 ):
     directory = os.path.expanduser(directory)
     metadata_path = os.path.join(directory, "train/metadata.txt")
     metadata = []
+    class_to_idx = {}
+    class_idx = 0
     with open(metadata_path, 'r') as reader:
         while reader:
             groupname = reader.readline().strip().split(',')[0]
@@ -109,8 +110,15 @@ def get_metadata_mytar(
                 img_class = values[1]
                 start = int(values[2])
                 img_size = int(values[3])
-                group.append({'idx':idx, 'img_class':img_class, 'start':start, 'img_size':img_size})
+                if img_class in class_to_idx:
+                    img_class_idx = class_to_idx[img_class]
+                else:
+                    class_to_idx[img_class] = class_idx
+                    img_class_idx = class_idx
+                    class_idx += 1
+                group.append({'idx':idx, 'img_class':img_class, 'img_class_idx':img_class_idx, 'start':start, 'img_size':img_size})
             metadata.append({'groupname':groupname, 'metadata':group})
+    print(class_to_idx)
     return metadata
 
 
@@ -157,21 +165,23 @@ class DatasetFolder(VisionDataset):
     ) -> None:
         super(DatasetFolder, self).__init__(root, transform=transform,
                                             target_transform=target_transform)
-        classes, class_to_idx = self._find_classes(self.root)
-        samples = self.make_dataset(self.root, class_to_idx, extensions, is_valid_file)
-        if len(samples) == 0:
-            msg = "Found 0 files in subfolders of: {}\n".format(self.root)
-            if extensions is not None:
-                msg += "Supported extensions are: {}".format(",".join(extensions))
-            raise RuntimeError(msg)
 
+        if hasattr(self, 'is_mytar') and self.is_mytar:
+            self.metadata = get_metadata_mytar(root, self.group_size)
+        else:
+            classes, class_to_idx = self._find_classes(self.root)
+            samples = self.make_dataset(self.root, class_to_idx, extensions, is_valid_file)
+            if len(samples) == 0:
+                msg = "Found 0 files in subfolders of: {}\n".format(self.root)
+                if extensions is not None:
+                    msg += "Supported extensions are: {}".format(",".join(extensions))
+                raise RuntimeError(msg)
+            self.classes = classes
+            self.class_to_idx = class_to_idx
+            self.samples = samples
+            self.targets = [s[1] for s in samples]
         self.loader = loader
         self.extensions = extensions
-
-        self.classes = classes
-        self.class_to_idx = class_to_idx
-        self.samples = samples
-        self.targets = [s[1] for s in samples]
 
     @staticmethod
     def make_dataset(
@@ -245,18 +255,16 @@ class DatasetFolder(VisionDataset):
         if self.is_mytar:
             path = self.root + '/train/' + self.metadata[index]['groupname']
             group_metadata = self.metadata[index]['metadata']
-            target = 0
             end = time.time()
-            samples = mytar_loader(path, group_metadata)
+            samples, targets = mytar_loader(path, group_metadata)
             load_time = time.time() - end
           #  print('load 4 images in a file time:{}'.format(load_time))
             if self.transform is not None:
                 samples = [self.transform(sample) for sample in samples]
             if self.target_transform is not None:
                 print("\n\nself.target_transform.....\n\n")
-                target = self.target_transform(target)
-            res = samples, target
-#            print(res)
+                targets = [self.target_transform(target) for target in targets]
+            res = samples, targets
             return res
             
 
@@ -298,7 +306,7 @@ class DatasetFolder(VisionDataset):
             end = time.time()
             sample = self.transform(sample)
             transform_time = time.time() - end
-            print("    transform one image time: {}".format(transform_time))
+            # print("    transform one image time: {}".format(transform_time))
         if self.target_transform is not None:
             target = self.target_transform(target)
 
@@ -412,7 +420,7 @@ class DatasetFolder(VisionDataset):
             end = time.time()
             sample = self.transform(sample)
             transform_time = time.time() - end
-            print("    transform one image time: {}".format(transform_time))
+            # print("    transform one image time: {}".format(transform_time))
         if self.target_transform is not None:
             target = self.target_transform(target)
 
@@ -494,6 +502,7 @@ def tar_loader(path: str) -> Image.Image:
 
 def mytar_loader(path: str, group_metadata):
     imgs = []
+    targets = []
     end = time.time()
     with open(path, 'rb') as f:
         f = f.read()
@@ -504,6 +513,9 @@ def mytar_loader(path: str, group_metadata):
                 end = time.time()
                 img_start = img_info['start']
                 img_end = img_start + img_info['img_size']
+                img_class_idx = img_info['img_class_idx']
+
+                # print('img_class_idx:{}'.format(img_class_idx))
                 img_data = f[img_start:img_end]
                 iobytes = io.BytesIO(img_data)
 
@@ -511,10 +523,11 @@ def mytar_loader(path: str, group_metadata):
                 end = time.time()
                 img = Image.open(iobytes)
                 imgs.append(img.convert('RGB'))
+                targets.append(img_class_idx)
                 pil_img_decode_time = time.time() - end
                 #print("    start:{} end:{} per_img_extract_tile: {}  pil_img_decode_time: {}".format(
                  #         img_start, img_end, per_img_extract_tile, pil_img_decode_time))
-    return imgs
+    return imgs, targets
 
 def mytar_loader_pack(path: str, group_metadata, pack_size, pack_index):
     imgs = []
@@ -704,12 +717,6 @@ class ImageFolder(DatasetFolder):
             group_size: int = 1,
             read_group_size: int = 0,
     ):
-        super(ImageFolder, self).__init__(root, loader, IMG_EXTENSIONS if is_valid_file is None else None,
-                                          transform=transform,
-                                          target_transform=target_transform,
-                                          is_valid_file=is_valid_file)
-
-        self.imgs = self.samples
         self.is_meng = is_meng
         self.is_zip = is_zip
         self.is_tar = is_tar
@@ -720,6 +727,11 @@ class ImageFolder(DatasetFolder):
             self.read_group_size = group_size
         else:
             self.read_group_size = read_group_size
+
+        super(ImageFolder, self).__init__(root, loader, IMG_EXTENSIONS if is_valid_file is None else None,
+                                          transform=transform,
+                                          target_transform=target_transform,
+                                          is_valid_file=is_valid_file)
 
         if(is_meng):
             print("meng's image folder!")
@@ -732,9 +744,6 @@ class ImageFolder(DatasetFolder):
         if(is_mytar):
             print("grouping using my own tar format!")
 
-
-        if self.is_mytar:
-            self.metadata = get_metadata_mytar(root, self.class_to_idx, group_size)
 
 
 
