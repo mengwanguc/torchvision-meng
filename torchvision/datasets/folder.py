@@ -96,9 +96,17 @@ def get_metadata_mytar(
     directory = os.path.expanduser(directory)
     metadata_path = os.path.join(directory, "metadata.txt")
     metadata = []
-    class_to_idx = {}
-    class_idx = 0
+    classes = []
     with open(metadata_path, 'r') as reader:
+        # first get all classes
+        class_count = int(reader.readline().strip())
+        for _ in range(class_count):
+            class_name = reader.readline().strip()
+            classes.append(class_name)
+        classes.sort()
+        class_to_idx = {cls_name: i for i, cls_name in enumerate(classes)} 
+        print(class_to_idx)
+        # then get all groups metadata
         while reader:
             groupname = reader.readline().strip().split(',')[0]
             if(groupname == ''):
@@ -110,12 +118,7 @@ def get_metadata_mytar(
                 img_class = values[1]
                 start = int(values[2])
                 img_size = int(values[3])
-                if img_class in class_to_idx:
-                    img_class_idx = class_to_idx[img_class]
-                else:
-                    class_to_idx[img_class] = class_idx
-                    img_class_idx = class_idx
-                    class_idx += 1
+                img_class_idx = class_to_idx[img_class]
                 group.append({'idx':idx, 'img_class':img_class, 'img_class_idx':img_class_idx, 'start':start, 'img_size':img_size})
             metadata.append({'groupname':groupname, 'metadata':group})
     print(class_to_idx)
@@ -313,7 +316,7 @@ class DatasetFolder(VisionDataset):
         return sample, target
 
     def __len__(self) -> int:
-        print("!!!!!!!!!!!!!!!calling len for folder")
+        # print("!!!!!!!!!!!!!!!calling len for folder")
         if self.is_mytar:
             return len(self.metadata) * int(self.group_size / self.read_group_size)
         else:
