@@ -94,7 +94,7 @@ def get_metadata_mytar(
     group_size: int
 ):
     directory = os.path.expanduser(directory)
-    metadata_path = os.path.join(directory, "train/metadata.txt")
+    metadata_path = os.path.join(directory, "metadata.txt")
     metadata = []
     class_to_idx = {}
     class_idx = 0
@@ -235,7 +235,7 @@ class DatasetFolder(VisionDataset):
             rg_count = int(self.group_size / self.read_group_size)
             group_index = int(index / rg_count)
             pack_index = index % rg_count
-            path = self.root + '/train/' + self.metadata[group_index]['groupname']
+            path = self.root + '/' + self.metadata[group_index]['groupname']
             group_metadata = self.metadata[group_index]['metadata']
             target = 0
             end = time.time()
@@ -253,7 +253,7 @@ class DatasetFolder(VisionDataset):
 
 
         if self.is_mytar:
-            path = self.root + '/train/' + self.metadata[index]['groupname']
+            path = self.root + '/' + self.metadata[index]['groupname']
             group_metadata = self.metadata[index]['metadata']
             end = time.time()
             samples, targets = mytar_loader(path, group_metadata)
@@ -347,7 +347,7 @@ class DatasetFolder(VisionDataset):
             rg_count = int(self.group_size / self.read_group_size)
             group_index = int(index / rg_count)
             pack_index = index % rg_count
-            path = self.root + '/train/' + self.metadata[group_index]['groupname']
+            path = self.root + '/' + self.metadata[group_index]['groupname']
             group_metadata = self.metadata[group_index]['metadata']
             target = 0
             end = time.time()
@@ -365,7 +365,7 @@ class DatasetFolder(VisionDataset):
 
 
         if self.is_mytar:
-            path = self.root + '/train/' + self.metadata[index]['groupname']
+            path = self.root + '/' + self.metadata[index]['groupname']
             group_metadata = self.metadata[index]['metadata']
             target = 0
             end = time.time()
