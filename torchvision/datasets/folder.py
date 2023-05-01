@@ -5,7 +5,29 @@ from PIL import Image
 import os
 import os.path
 from typing import Any, Callable, cast, Dict, List, Optional, Tuple
+import sys, time
+from pympler import asizeof
 
+
+def get_size(obj, seen=None):
+    """Recursively finds size of objects"""
+    size = sys.getsizeof(obj)
+    if seen is None:
+        seen = set()
+    obj_id = id(obj)
+    if obj_id in seen:
+        return 0
+    # Important mark as seen *before* entering recursion to gracefully handle
+    # self-referential objects
+    seen.add(obj_id)
+    if isinstance(obj, dict):
+        size += sum([get_size(v, seen) for v in obj.values()])
+        size += sum([get_size(k, seen) for k in obj.keys()])
+    elif hasattr(obj, '__dict__'):
+        size += get_size(obj.__dict__, seen)
+    elif hasattr(obj, '__iter__') and not isinstance(obj, (str, bytes, bytearray)):
+        size += sum([get_size(i, seen) for i in obj])
+    return size
 
 def has_file_allowed_extension(filename: str, extensions: Tuple[str, ...]) -> bool:
     """Checks if a file is an allowed extension.
@@ -176,10 +198,28 @@ class DatasetFolder(VisionDataset):
         """
         path, target = self.samples[index]
         sample = self.loader(path)
+        sizes = {}
+        filesize = os.path.getsize(path)
+        sizes['filesize'] = filesize
+
+        sizes['after decoding'] = sys.getsizeof(sample.tobytes())
+        sizes['original shape'] = sample.size
+
         if self.transform is not None:
-            sample = self.transform(sample)
+            # sample = self.transform(sample)
+            compose = self.transform
+            for t in compose.transforms:
+                sample = t(sample)
+                # print(sample)
+                if hasattr(sample, 'im'):
+                    sizes['after {}'.format(t)] = sys.getsizeof(sample.tobytes())
+                else:
+                    sizes['after {}'.format(t)] = sample.nelement() * sample.element_size()
+                    # print(list(sample.getdata()))
         if self.target_transform is not None:
             target = self.target_transform(target)
+        
+        print(sizes)
 
         return sample, target
 
@@ -193,9 +233,34 @@ IMG_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.ppm', '.bmp', '.pgm', '.tif', '.tif
 def pil_loader(path: str) -> Image.Image:
     # open path as file to avoid ResourceWarning (https://github.com/python-pillow/Pillow/issues/835)
     with open(path, 'rb') as f:
+        start = time.time()
         img = Image.open(f)
-        return img.convert('RGB')
+        end = time.time()
+        image_open_time = end-start
 
+        filesize = os.path.getsize(path)
+        initial_img_size = asizeof.asizeof(img)
+
+        start = time.time()
+        img.load()
+        end = time.time()
+        img_load_time = end-start
+
+        size_after_load = asizeof.asizeof(img)
+
+        start = time.time()
+        res = img.convert('RGB')
+        end = time.time()
+        img_corvert_time = end-start
+
+        size_after_convert = asizeof.asizeof(res)
+        # print("image_open_time: {}  img_load_time: {}   img_corvert_time: {}".format(image_open_time, img_load_time, img_corvert_time))
+        # print("filesize: {} initial_img_size: {}    size_after_load: {} size_after_convert: {}".format(filesize, initial_img_size, size_after_load, size_after_convert))
+        # im = res.getdata()
+        # img_list = list(im)
+        # print("palette: {}  pyaccess: {}    getdata: {} list_lenth: {}  im_sizea: {}".format(
+        #                 res.palette, res.pyaccess, res.getdata(), len(img_list),  asizeof.asizeof(im.tobytes())))
+        return res
 
 # TODO: specify the return type
 def accimage_loader(path: str) -> Any:
