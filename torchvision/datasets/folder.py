@@ -7,6 +7,7 @@ import os.path
 from typing import Any, Callable, cast, Dict, List, Optional, Tuple
 
 import io
+import traceback
 
 
 def has_file_allowed_extension(filename: str, extensions: Tuple[str, ...]) -> bool:
@@ -217,15 +218,24 @@ class DatasetFolder(VisionDataset):
         Returns:
             tuple: (sample, target) where target is class_index of the target class.
         """
+        print("-- call stack")
+        for line in traceback.format_stack():
+            print(line.strip())
+        print("---\n")
         if self.is_mytar:
             path = self.root + '/' + self.metadata[index]['groupname']
+            print("path ->", path)
             group_metadata = self.metadata[index]['metadata']
+            print(group_metadata)
             samples, targets = mytar_loader(path, group_metadata)
+            print("samples, targets ->", samples, targets)
             if self.transform is not None:
                 samples = [self.transform(sample) for sample in samples]
+                print("samples2 ->", samples)
             if self.target_transform is not None:
                 print("\n\nself.target_transform.....\n\n")
                 targets = [self.target_transform(target) for target in targets]
+                print("targets->", targets)
             res = samples, targets
             return res
 
@@ -335,6 +345,14 @@ class ImageFolder(DatasetFolder):
             is_mytar: bool = False,
             group_size: int = 1,
     ):
+        
+        # print("root", root)
+        # print("transform", transform)
+        # print("target_transform", target_transform)
+        # print("loader", loader)
+        # print("is_valid_file", is_valid_file)
+        # print("is_async", is_async)
+        
         self.is_mytar = is_mytar
         self.group_size = group_size
 
@@ -343,7 +361,8 @@ class ImageFolder(DatasetFolder):
                                           target_transform=target_transform,
                                           is_valid_file=is_valid_file)
         if not is_mytar:
-            self.imgs = self.samples
+            self.imgs = self.samples        
+
 
         if(is_mytar):
             print("grouping using my own tar format!")
