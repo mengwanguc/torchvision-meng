@@ -8,6 +8,9 @@
 #define __MINIO_MODULE_H_
 
 #include <stdlib.h>
+#include <include/uthash.h>
+
+#define MAX_PATH_LENGTH 128
 
 /* Cache replacement policy. */
 typedef enum {
@@ -16,20 +19,26 @@ typedef enum {
     N_POLICIES
 } policy_t;
 
-/* TODO find a hash table library to use. */
-typedef int hash_t;
+/* Hash table entry. Maps filepath to cached data. An entry must be in the hash
+   table IFF the corresponding file is cached. */
+typedef struct {
+    char    filepath[MAX_PATH_LENGTH];    /* Key. Filepath of file. */
+    void   *ptr;                          /* Pointer to this file's data. */
+    size_t  size;                         /* Size of file data in bytes. */
+
+    UT_hash_handle hh;
+} hash_entry_t;
 
 /* Cache. */
 typedef struct {
     /* Configuration. */
-    policy_t policy;    /* Replacement policy. Only MinIO supported. */
-    size_t   size;      /* Size of cache in bytes. */
-    size_t   used;      /* Number of bytes cached. */
+    policy_t policy;        /* Replacement policy. Only MinIO supported. */
+    size_t   size;          /* Size of cache in bytes. */
+    size_t   used;          /* Number of bytes cached. */
 
     /* State. */
-    uint8_t *data;      /* SIZE bytes of memory. */
-    uint8_t *next;      /* Next unused byte of memory. */
-    hash_t  *ht;        /* Hash table, maps filename to beginning of data. */
+    uint8_t      *data;     /* First byte of SIZE bytes of memory. */
+    hash_entry_t *ht;       /* Hash table, maps filename to data. */
 } cache_t;
 
 #endif

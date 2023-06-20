@@ -10,9 +10,12 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <assert.h>
+#include <fcntl.h>
 #include <sys/mman.h>
 
 #include <include/uthash.h>
+
 
 /* ------------------------ */
 /*   REPLACEMENT POLICIES   */
@@ -31,8 +34,6 @@ policy_FIFO(cache_t *cache, void *item, size_t size)
 static uint64_t
 policy_MINIO(cache_t *cache, void *item, size_t size)
 {
-   static uint8_t *next;
-
    return NULL;
 }
 
@@ -48,14 +49,62 @@ static policy_func_t *policy_table[N_POLICIES] = {
 /* ------------- */
 
 /* Read an item from CACHE into DATA, indexed by FILEPATH, and located on the
-   filesystem at FILEPATH. If the cached file is greater than MAX_SIZE bytes,
-   DATA is filled with the first MAX_SIZE bytes, and -1 is returned. Otherwise,
-   0 is returned on success. */
+   filesystem at FILEPATH. If the cached file is greater than MAX_SIZE bytes, -1
+   is returned. Otherwise, all data is copied and 0 is returned on success. */
 int
-cache_get(cache_t *cache, char *filepath, void *data, uint64_t max_size)
+cache_read(cache_t *cache, char *filepath, void *data, uint64_t max_size)
 {
-   /* TODO: use direct IO to read in the file, to bypass the page cache. */
-   return NULL;
+   /* Check if the file is cached. */
+   hash_entry_t *entry = NULL;
+   HASH_FIND_STR(cache->ht, filepath, entry);
+   if (entry != NULL) {
+      /* Don't overflow the buffer. */
+      if (entry->size > max_size) {
+         return -1;
+      }
+      memcpy(data, entry->ptr, entry->size);
+
+      return 0;
+   }
+
+   /* Open the file in DIRECT mode. */
+   int fd = open(filepath, O_RDONLY | __O_DIRECT);
+   if (fd == -1 ) {
+      return -1;
+   }
+   FILE *file = fdopen(fd);
+
+   /* Ensure the size of the file is OK. */
+   fseek(file, 0L, SEEK_END);
+   size_t size = ftell(file);
+   if (size > max_size) {
+      fclose(file);
+      return -1;
+   }
+   rewind(file);
+
+   /* Read into data and cache the data if it'll fit. */
+   fread(data, size, 1, file);
+   if (size <= cache->size - cache->used) {
+      /* Make an entry. */
+      entry = malloc(sizeof(hash_entry_t));
+      if (entry == NULL) {
+         return -1;
+      }
+      strncpy(entry->filepath, filepath, MAX_PATH_LENGTH);
+      entry->size = size;
+      entry->hh;
+
+      /* Copy data to the cache. */
+      entry->ptr = cache->data + cache->used;
+      memcpy(entry->ptr, data, size);
+      cache->used += size;
+
+      /* Place the entry into the hash table. */
+      HASH_ADD_STR(cache->ht, filepath, entry);
+   }
+
+   return 0;
 }
 
 /* Initialize a cache CACHE with SIZE bytes and POLICY replacement policy. On
@@ -68,7 +117,8 @@ cache_init(cache_t *cache, size_t size, policy_t policy)
    cache->used = 0;
    cache->policy = policy;
 
-   /* TODO: initialize the filename -> void * hash table. */
+   /* Initialize the hash table. */
+   cache->ht = NULL;
 
    /* Allocate the cache's memory. */
    if ((cache->data = malloc(size)) == NULL) {
