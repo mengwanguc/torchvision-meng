@@ -42,7 +42,7 @@ typedef struct {
 } cache_t;
 
 
-int cache_read(cache_t *cache, char *filepath, void *data, uint64_t max_size);
+size_t cache_read(cache_t *cache, char *filepath, void *data, uint64_t max_size);
 int cache_init(cache_t *cache, size_t size, policy_t policy);
 
 #endif

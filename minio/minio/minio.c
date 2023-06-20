@@ -50,8 +50,9 @@ static policy_func_t *policy_table[N_POLICIES] = {
 
 /* Read an item from CACHE into DATA, indexed by FILEPATH, and located on the
    filesystem at FILEPATH. If the cached file is greater than MAX_SIZE bytes, -1
-   is returned. Otherwise, all data is copied and 0 is returned on success. */
-int
+   is returned. Otherwise, all data is copied and the number of bytes copied is
+   returned on success. */
+size_t
 cache_read(cache_t *cache, char *filepath, void *data, uint64_t max_size)
 {
    /* Check if the file is cached. */
@@ -64,7 +65,7 @@ cache_read(cache_t *cache, char *filepath, void *data, uint64_t max_size)
       }
       memcpy(data, entry->ptr, entry->size);
 
-      return 0;
+      return entry->size;
    }
 
    /* Open the file in DIRECT mode. */
@@ -104,7 +105,7 @@ cache_read(cache_t *cache, char *filepath, void *data, uint64_t max_size)
       HASH_ADD_STR(cache->ht, filepath, entry);
    }
 
-   return 0;
+   return size;
 }
 
 /* Initialize a cache CACHE with SIZE bytes and POLICY replacement policy. On
