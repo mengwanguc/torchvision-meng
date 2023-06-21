@@ -5,6 +5,7 @@
 
 #include "minio.h"
 
+#include <errno.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -49,10 +50,9 @@ static policy_func_t *policy_table[N_POLICIES] = {
 /* ------------- */
 
 /* Read an item from CACHE into DATA, indexed by FILEPATH, and located on the
-   filesystem at FILEPATH. If the cached file is greater than MAX_SIZE bytes, -1
-   is returned. Otherwise, all data is copied and the number of bytes copied is
-   returned on success. */
-size_t
+   filesystem at FILEPATH. On failure returns ERRNO code with negative value,
+   otherwise returns bytes read on success. */
+ssize_t
 cache_read(cache_t *cache, char *filepath, void *data, uint64_t max_size)
 {
    /* Check if the file is cached. */
@@ -61,7 +61,7 @@ cache_read(cache_t *cache, char *filepath, void *data, uint64_t max_size)
    if (entry != NULL) {
       /* Don't overflow the buffer. */
       if (entry->size > max_size) {
-         return -1;
+         return -EINVAL;
       }
       memcpy(data, entry->ptr, entry->size);
 
@@ -70,8 +70,8 @@ cache_read(cache_t *cache, char *filepath, void *data, uint64_t max_size)
 
    /* Open the file in DIRECT mode. */
    int fd = open(filepath, O_RDONLY | __O_DIRECT);
-   if (fd == -1 ) {
-      return -1;
+   if (fd < 0) {
+      return -ENOENT;
    }
    FILE *file = fdopen(fd, "r");
 
@@ -80,7 +80,7 @@ cache_read(cache_t *cache, char *filepath, void *data, uint64_t max_size)
    size_t size = ftell(file);
    if (size > max_size) {
       fclose(file);
-      return -1;
+      return -EINVAL;
    }
    rewind(file);
 
@@ -90,11 +90,10 @@ cache_read(cache_t *cache, char *filepath, void *data, uint64_t max_size)
       /* Make an entry. */
       entry = malloc(sizeof(hash_entry_t));
       if (entry == NULL) {
-         return -1;
+         return -ENOMEM;
       }
       strncpy(entry->filepath, filepath, MAX_PATH_LENGTH);
       entry->size = size;
-      entry->hh;
 
       /* Copy data to the cache. */
       entry->ptr = cache->data + cache->used;
@@ -109,7 +108,7 @@ cache_read(cache_t *cache, char *filepath, void *data, uint64_t max_size)
 }
 
 /* Initialize a cache CACHE with SIZE bytes and POLICY replacement policy. On
-   success, 0 is returned. On failure, -1 is returned. */
+   success, 0 is returned. On failure, negative ERRNO value is returned. */
 int
 cache_init(cache_t *cache, size_t size, policy_t policy)
 {
@@ -123,14 +122,12 @@ cache_init(cache_t *cache, size_t size, policy_t policy)
 
    /* Allocate the cache's memory. */
    if ((cache->data = malloc(size)) == NULL) {
-      fprintf(stderr, "Failed to allocate the cache's memory (do you have permission to mlock?). Aborting.\n");
-      return -1;
+      return -ENOMEM;
    }
 
    /* Pin the cache's memory. */
    if (mlock(cache->data, size) != 0) {
-      fprintf(stderr, "Failed to pin the cache's memory. Aborting.\n");
-      return -1;
+      return -EPERM;
    }
 
    return 0;

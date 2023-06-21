@@ -7,7 +7,10 @@
 /* Python wrapper for cache_t type. */
 typedef struct {
     PyObject_HEAD
-    cache_t cache;
+
+    cache_t  cache;          /* MinIO cache. */
+    size_t   max_file_size;  /* Max file size we allow in this cache. */
+    uint8_t *temp;           /* MAX_FILE_SIZE bytes used for copying. */
 } PyCache;
 
 /* PyCache deallocate method. */
@@ -42,15 +45,35 @@ static int
 PyCache_init(PyCache *self, PyObject *args, PyObject *kwds)
 {
     /* Parse arguments. */
-    size_t size;
-    static char *kwlist[] = {"size", NULL};
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|i", kwlist, &size)) {
-        PyErr_BadArgument();
+    int size, max_file_size;
+    static char *kwlist[] = {"size", "max_file_size", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "ii", kwlist, &size, &max_file_size)) {
+        PyErr_SetString(PyExc_Exception, "missing argument");
         return -1;
     }
-    
+
+    /* Set up the copy area. */
+    self->max_file_size = max_file_size;
+    if ((self->temp = malloc(max_file_size)) == NULL) {
+        PyErr_SetString(PyExc_MemoryError, "couldn't allocate temp area");
+        PyErr_NoMemory();
+        return -1;
+    }
+
     /* Initialize the cache. */
-    cache_init(&self->cache.data, size, POLICY_MINIO);
+    int status = cache_init(&self->cache, size, POLICY_MINIO);
+    if (status < 0) {
+        switch (status) {
+            case -ENOMEM:
+                PyErr_SetString(PyExc_MemoryError, "couldn't allocate cache");
+                break;
+            case -EPERM:
+                PyErr_SetString(PyExc_PermissionError, "couldn't pin cache memory");
+                break;
+        }
+
+        return -1;
+    }
 
     return 0;
 }
@@ -60,19 +83,59 @@ static PyObject *
 PyCache_read(PyCache *self, PyObject *args, PyObject *kwds)
 {
     /* Parse arguments. */
-    char filepath[MAX_PATH_LENGTH + 1];
+    char *filepath;
     static char *kwlist[] = {"filepath", NULL};
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|s", kwlist, &filepath)) {
-        PyErr_BadArgument();
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "s", kwlist, &filepath)) {
+        PyErr_SetString(PyExc_Exception, "missing argument");
         return NULL;
     }
 
-    return NULL;
+    /* Get the file contents. */
+    ssize_t size = cache_read(&self->cache,
+                             filepath,
+                             self->temp,
+                             self->max_file_size);
+    if (size < 0l) {
+        switch (size) {
+            case -EINVAL:
+                PyErr_SetString(PyExc_MemoryError, "insufficient buffer size");
+                break;
+            case -ENOMEM:
+                PyErr_SetString(PyExc_MemoryError, "unable to allocate hash table entry");
+                break;
+            case -ENOENT:
+                PyErr_SetString(PyExc_FileNotFoundError, filepath);
+                break;
+            default:
+                PyErr_SetString(PyExc_Exception, "unknown exception");
+                break;
+        }
+
+        return NULL;
+    }
+    
+    return PyBytes_FromStringAndSize((char *) self->temp, size);
+}
+
+/* PyCache method to get the cache's "size" field. */
+static PyObject *
+PyCache_get_size(PyCache *self, PyObject *args, PyObject *kwds)
+{
+    return PyLong_FromLong(self->cache.size);
+}
+
+/* PyCache method to get the cache's "used" field. */
+static PyObject *
+PyCache_get_used(PyCache *self, PyObject *args, PyObject *kwds)
+{
+    return PyLong_FromLong(self->cache.used);
 }
 
 /* PyCache methods. */
 static PyMethodDef PyCache_methods[] = {
-    {"get", (PyCFunction) PyCache_read, METH_KEYWORDS, "Get a file through the cache."},
+    {"read_file", (PyCFunction) PyCache_read, METH_VARARGS | METH_KEYWORDS, "Read a file through the cache."},
+    {"get_size", (PyCFunction) PyCache_get_size, METH_NOARGS, "Get size of cache in bytes."},
+    {"get_used", (PyCFunction) PyCache_get_used, METH_NOARGS, "Get number of bytes used in cache."},
     {NULL} /* Sentinel. */
 };
 
@@ -105,7 +168,7 @@ static struct PyModuleDef miniomodule = {
 };
 
 PyMODINIT_FUNC
-PyInit_miniomodule(void)
+PyInit_minio(void)
 {
     PyObject *module;
     
@@ -121,7 +184,7 @@ PyInit_miniomodule(void)
 
     /* Add the PythonCacheType type. */
     Py_INCREF(&PythonCacheType);
-    if (PyModule_AddObject(module, "Cache", (PyObject *) &PythonCacheType) < 0) {
+    if (PyModule_AddObject(module, "PyCache", (PyObject *) &PythonCacheType) < 0) {
         Py_DECREF(&PythonCacheType);
         Py_DECREF(module);
         return NULL;
