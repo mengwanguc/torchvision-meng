@@ -6,5 +6,6 @@ setup(name = 'MinIO',
       author = 'Gus Waldspurger',
       author_email = 'gus@waldspurger.com',
       ext_modules = [
-            Extension('minio', sources = ['miniomodule.c', '../minio/minio.c'])
+            Extension('minio', sources = ['csrc/miniomodule/miniomodule.c',
+                                          'csrc/minio/minio.c'])
       ])

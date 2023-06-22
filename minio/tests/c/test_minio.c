@@ -3,7 +3,7 @@
    MinIO file cache tests.
    */
 
-#include "../minio/minio.h"
+#include "../../csrc/minio/minio.h"
 
 #include <stdio.h>
 #include <time.h>
@@ -136,9 +136,9 @@ int
 main(int argc, char **argv)
 {
     char *test_files[N_TEST_FILES] = {
-        "./test-images/2MB.bmp",
-        "./test-images/4MB.bmp",
-        "./test-images/20MB.bmp"
+        "../test-images/2MB.bmp",
+        "../test-images/4MB.bmp",
+        "../test-images/20MB.bmp"
     };
 
     bool should_cache[N_TEST_FILES] = {
