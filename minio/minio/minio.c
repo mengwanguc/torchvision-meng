@@ -74,18 +74,25 @@ cache_read(cache_t *cache, char *filepath, void *data, uint64_t max_size)
       return -ENOENT;
    }
    FILE *file = fdopen(fd, "r");
+   if (file == NULL) {
+      close(fd);
+      return -EBADFD;
+   }
 
    /* Ensure the size of the file is OK. */
    fseek(file, 0L, SEEK_END);
    size_t size = ftell(file);
    if (size > max_size) {
       fclose(file);
+      close(fd);
       return -EINVAL;
    }
    rewind(file);
 
    /* Read into data and cache the data if it'll fit. */
    read(fd, data, size);
+   fclose(file);
+   close(fd);
    if (size <= cache->size - cache->used) {
       /* Make an entry. */
       entry = malloc(sizeof(hash_entry_t));
