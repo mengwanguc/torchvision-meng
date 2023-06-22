@@ -6,6 +6,8 @@ import os
 import os.path
 from typing import Any, Callable, cast, Dict, List, Optional, Tuple
 
+import minio
+
 
 def has_file_allowed_extension(filename: str, extensions: Tuple[str, ...]) -> bool:
     """Checks if a file is an allowed extension.
@@ -190,15 +192,14 @@ class DatasetFolder(VisionDataset):
 IMG_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.ppm', '.bmp', '.pgm', '.tif', '.tiff', '.webp')
 
 
-def pil_loader(path: str) -> Image.Image:
-    # open path as file to avoid ResourceWarning (https://github.com/python-pillow/Pillow/issues/835)
-    with open(path, 'rb') as f:
-        img = Image.open(f)
-        return img.convert('RGB')
+def pil_loader(path: str, cache: minio.PyCache) -> Image.Image:
+    # Use MinIO cache to open the file.
+    img = Image.frombytes(cache.read_file(path))
+    return img.convert('RGB')
 
 
 # TODO: specify the return type
-def accimage_loader(path: str) -> Any:
+def accimage_loader(path: str, cache: minio.PyCache) -> Any:
     import accimage
     try:
         return accimage.Image(path)
@@ -207,7 +208,7 @@ def accimage_loader(path: str) -> Any:
         return pil_loader(path)
 
 
-def default_loader(path: str) -> Any:
+def default_loader(path: str, cache: minio.PyCache) -> Any:
     from torchvision import get_image_backend
     if get_image_backend() == 'accimage':
         return accimage_loader(path)
@@ -244,6 +245,8 @@ class ImageFolder(DatasetFolder):
 
     def __init__(
             self,
+            cache_size: int,                # Cache size in bytes.
+            cache_max_item_size: int,       # Max item size in bytes.
             root: str,
             transform: Optional[Callable] = None,
             target_transform: Optional[Callable] = None,
@@ -255,3 +258,4 @@ class ImageFolder(DatasetFolder):
                                           target_transform=target_transform,
                                           is_valid_file=is_valid_file)
         self.imgs = self.samples
+        self.cache = minio.PyCache(size=cache_size, max_file_size=cache_max_item_size)
