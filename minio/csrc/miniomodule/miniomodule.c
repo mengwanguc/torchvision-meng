@@ -15,35 +15,25 @@ typedef struct {
 
 /* PyCache deallocate method. */
 static void
-PyCache_dealloc(PyCache *self)
+PyCache_dealloc(PyObject *self)
 {
+    PyCache *cache = (PyCache *) self;
+
     /* Free the memory allocate for the cache region. */
-    if (self->cache.data != NULL) {
-        free(self->cache.data);
+    if (cache->cache.data != NULL) {
+        free(cache->cache.data);
     }
 
     /* Free the cache struct itself. */
-    Py_TYPE(self)->tp_free((PyObject *) self);
-}
-
-/* PyCache creation method. */
-static PyObject *
-PyCache_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
-{
-    /* Allocate the PyCache struct. */
-    PyCache *self;
-    if ((self = (PyCache *) type->tp_alloc(type, 0)) == NULL) {
-        PyErr_NoMemory();
-        return NULL;
-    }
-
-    return (PyObject *) self;
+    Py_TYPE(cache)->tp_free((PyObject *) cache);
 }
 
 /* PyCache initialization method. */
 static int
-PyCache_init(PyCache *self, PyObject *args, PyObject *kwds)
+PyCache_init(PyObject *self, PyObject *args, PyObject *kwds)
 {
+    PyCache *cache = (PyCache *) self;
+
     /* Parse arguments. */
     int size, max_file_size;
     static char *kwlist[] = {"size", "max_file_size", NULL};
@@ -53,15 +43,15 @@ PyCache_init(PyCache *self, PyObject *args, PyObject *kwds)
     }
 
     /* Set up the copy area. */
-    self->max_file_size = max_file_size;
-    if ((self->temp = malloc(max_file_size)) == NULL) {
+    cache->max_file_size = max_file_size;
+    if ((cache->temp = malloc(max_file_size)) == NULL) {
         PyErr_SetString(PyExc_MemoryError, "couldn't allocate temp area");
         PyErr_NoMemory();
         return -1;
     }
 
     /* Initialize the cache. */
-    int status = cache_init(&self->cache, size, POLICY_MINIO);
+    int status = cache_init(&cache->cache, size, POLICY_MINIO);
     if (status < 0) {
         switch (status) {
             case -ENOMEM:
@@ -76,6 +66,20 @@ PyCache_init(PyCache *self, PyObject *args, PyObject *kwds)
     }
 
     return 0;
+}
+
+/* PyCache creation method. */
+static PyObject *
+PyCache_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
+    /* Allocate the PyCache struct. */
+    PyCache *self;
+    if ((self = (PyCache *) type->tp_alloc(type, 0)) == NULL) {
+        PyErr_NoMemory();
+        return NULL;
+    }
+
+    return (PyObject *) self;
 }
 
 /* PyCache read/get method. */

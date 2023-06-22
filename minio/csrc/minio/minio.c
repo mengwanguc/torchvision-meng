@@ -39,6 +39,7 @@ policy_MINIO(cache_t *cache, void *item, size_t size)
 }
 
 /* Policy table converts from policy_t enum to policy function. */
+__attribute__ ((unused))
 static policy_func_t *policy_table[N_POLICIES] = {
    policy_FIFO,
    policy_MINIO

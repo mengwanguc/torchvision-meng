@@ -22,9 +22,9 @@ typedef enum {
 /* Hash table entry. Maps filepath to cached data. An entry must be in the hash
    table IFF the corresponding file is cached. */
 typedef struct {
-    char    filepath[MAX_PATH_LENGTH];    /* Key. Filepath of file. */
-    void   *ptr;                          /* Pointer to this file's data. */
-    size_t  size;                         /* Size of file data in bytes. */
+    char    filepath[MAX_PATH_LENGTH + 1];  /* Key. Filepath of file. */
+    void   *ptr;                            /* Pointer to this file's data. */
+    size_t  size;                           /* Size of file data in bytes. */
 
     UT_hash_handle hh;
 } hash_entry_t;
