@@ -1,3 +1,8 @@
+/* Author:  Gus Waldspurger
+
+   Python wrapper for MinIO cache.
+   */
+
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
 
