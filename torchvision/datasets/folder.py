@@ -258,5 +258,5 @@ class ImageFolder(DatasetFolder):
                                           target_transform=target_transform,
                                           is_valid_file=is_valid_file)
         self.imgs = self.samples
-        print("Creating MinIO cache with size {}B and max file size {}B", cache_size, cache_max_item_size)
-        self.cache = minio.PyCache(size=cache_size, max_file_size=cache_max_item_size)
+        print("Creating MinIO cache with size {}B and max file size {}B".format(cache_size, cache_max_item_size))
+        self.cache = minio.PyCache(cache_size, cache_max_item_size)
