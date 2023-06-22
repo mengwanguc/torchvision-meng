@@ -107,6 +107,14 @@ cache_read(cache_t *cache, char *filepath, void *data, uint64_t max_size)
    return size;
 }
 
+/* Clear the cache's hash table and reset used bytes to zero. */
+void
+cache_flush(cache_t *cache)
+{
+   HASH_CLEAR(hh, cache->ht);
+   cache->used = 0;
+}
+
 /* Initialize a cache CACHE with SIZE bytes and POLICY replacement policy. On
    success, 0 is returned. On failure, negative ERRNO value is returned. */
 int

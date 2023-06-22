@@ -117,6 +117,15 @@ PyCache_read(PyCache *self, PyObject *args, PyObject *kwds)
     return PyBytes_FromStringAndSize((char *) self->temp, size);
 }
 
+/* PyCache method to flush the cache. */
+static PyObject *
+PyCache_flush(PyCache *self, PyObject *args, PyObject *kwds)
+{
+    cache_flush(&self->cache);
+
+    return PyLong_FromLong(0);
+}
+
 /* PyCache method to get the cache's "size" field. */
 static PyObject *
 PyCache_get_size(PyCache *self, PyObject *args, PyObject *kwds)
@@ -134,6 +143,7 @@ PyCache_get_used(PyCache *self, PyObject *args, PyObject *kwds)
 /* PyCache methods. */
 static PyMethodDef PyCache_methods[] = {
     {"read_file", (PyCFunction) PyCache_read, METH_VARARGS | METH_KEYWORDS, "Read a file through the cache."},
+    {"flush", (PyCFunction) PyCache_flush, METH_NOARGS, "Flush the cache."},
     {"get_size", (PyCFunction) PyCache_get_size, METH_NOARGS, "Get size of cache in bytes."},
     {"get_used", (PyCFunction) PyCache_get_used, METH_NOARGS, "Get number of bytes used in cache."},
     {NULL} /* Sentinel. */
