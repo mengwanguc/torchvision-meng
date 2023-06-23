@@ -2,6 +2,7 @@ from .vision import VisionDataset
 
 from PIL import Image
 
+import io
 import os
 import os.path
 from typing import Any, Callable, cast, Dict, List, Optional, Tuple
@@ -194,8 +195,8 @@ IMG_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.ppm', '.bmp', '.pgm', '.tif', '.tif
 
 def pil_loader(path: str, cache: minio.PyCache) -> Image.Image:
     # Use MinIO cache to open the file.
-    data, nbytes = cache.read_file(path)
-    return Image.frombytes(mode='RGB', data=data, size=nbytes)
+    data, _ = cache.read_file(path)
+    return Image.open(io.StringIO(data))
 
 
 # TODO: specify the return type
