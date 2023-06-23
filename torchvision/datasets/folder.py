@@ -195,8 +195,7 @@ IMG_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.ppm', '.bmp', '.pgm', '.tif', '.tif
 def pil_loader(path: str, cache: minio.PyCache) -> Image.Image:
     # Use MinIO cache to open the file.
     data, nbytes = cache.read_file(path)
-    img = Image.frombytes(data=data, size=nbytes)
-    return img.convert('RGB')
+    return Image.frombytes(mode='RGB', data=data, size=nbytes)
 
 
 # TODO: specify the return type
