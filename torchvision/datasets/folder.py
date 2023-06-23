@@ -213,7 +213,7 @@ def default_loader(path: str, cache: minio.PyCache) -> Any:
     if get_image_backend() == 'accimage':
         return accimage_loader(path)
     else:
-        return pil_loader(path)
+        return pil_loader(path, cache)
 
 
 class ImageFolder(DatasetFolder):
