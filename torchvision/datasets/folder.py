@@ -177,7 +177,7 @@ class DatasetFolder(VisionDataset):
             tuple: (sample, target) where target is class_index of the target class.
         """
         path, target = self.samples[index]
-        sample = self.loader(path)
+        sample = self.loader(path, self.cache)
         if self.transform is not None:
             sample = self.transform(sample)
         if self.target_transform is not None:
@@ -258,5 +258,5 @@ class ImageFolder(DatasetFolder):
                                           target_transform=target_transform,
                                           is_valid_file=is_valid_file)
         self.imgs = self.samples
-        print("Creating MinIO cache with size {}B and max file size {}B".format(cache_size, cache_max_item_size))
+        print("Creating MinIO cache with size {} KB and max file size {} KB".format(cache_size / 1024, cache_max_item_size / 1024))
         self.cache = minio.PyCache(cache_size, cache_max_item_size)
