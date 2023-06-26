@@ -4,6 +4,8 @@ import os
 import os.path
 from typing import Any, Callable, Optional, Tuple
 
+import io
+import json
 
 class CocoCaptions(VisionDataset):
     """`MS Coco Captions <https://cocod ataset.org/#captions-2015>`_ Dataset.
@@ -85,6 +87,104 @@ class CocoCaptions(VisionDataset):
     def __len__(self) -> int:
         return len(self.ids)
 
+def mytar_loader(path: str, group_metadata):
+    imgs = []
+    targets = []
+    with open(path, 'rb') as f:
+        f = f.read()
+        for img_info in group_metadata:
+                img_start = img_info['start']
+                img_end = img_start + img_info['img_size']
+                annotations = img_info['annotations']
+                # img_class_idx = img_info['img_class_idx']
+                # print('img_class_idx:{}'.format(img_class_idx))
+                img_data = f[img_start:img_end]
+                iobytes = io.BytesIO(img_data)
+                img = Image.open(iobytes)
+                imgs.append(img.convert('RGB'))
+                targets.append(annotations)
+    return imgs, targets
+
+
+# meng: get metadata so we know the classes and index of images.
+def get_metadata_mytar(
+    directory: str,
+    group_size: int
+):
+    directory = os.path.expanduser(directory)
+    metadata_path = os.path.join(directory, str(group_size)+ "/metadata.txt")
+    metadata = []
+    classes = []
+    with open(metadata_path, 'r') as reader:
+        # first get all classes
+        class_count = int(reader.readline().strip())
+        for _ in range(class_count):
+            class_name = reader.readline().strip()
+            classes.append(class_name)
+        classes.sort()
+        class_to_idx = {cls_name: i for i, cls_name in enumerate(classes)}
+        # print(class_to_idx)
+        # then get all groups metadata
+        while reader:
+            groupname = reader.readline().strip().split(',')[0]
+            if(groupname == ''):
+                break
+            group = []
+            for i in range(group_size):
+                # print("reader -> ", reader.readline())
+                tar_info, img_anns = reader.readline().strip().split('-')
+                values = tar_info.strip().split(',')
+                # print("values -> ", values)
+                # quit()
+                idx = values[0]
+                # img_class = values[1]
+                start = int(values[1])
+                img_size = int(values[2])
+                # annotations = str(values[4])
+                # print("annotations -> ", annotations)
+                # annotations = str(values[5])
+                # print("annotations -> ", annotations)
+                # annotations = reader.readline().strip().split('-')[3]
+                # print(type(img_anns))
+                
+                # print("annotations -> ", img_anns)
+                
+
+                string_data = img_anns.replace("'", "\"")
+                # print(type(string_data))
+                
+
+                annotations = json.loads(string_data)
+                # print(annotations, type(annotations))
+                # print(test[0], type(test[0]))
+        
+                
+                # Convert the string to a dictionary
+                # annotations = json.loads(annotations)
+                # print("annotations -> ", annotations, type(annotations))
+                # print("keys -> ", annotations.keys())
+                # print("\n")
+                # print("annotations -> ", annotations['id' == 1403624])
+
+                
+
+
+
+
+                # Remove the single quotes around the keys and values
+                # data_string = annotations.replace("'", '"')
+                # print("data_string -> ", data_string)
+
+                # # Parse the string as a list of dictionaries
+                # annotations = json.loads(data_string)
+
+                # print("annotations -> ", annotations, type(annotations))
+                # img_class_idx = class_to_idx[img_class]
+                group.append({'idx':idx, 'start':start, 'img_size':img_size, 'annotations': annotations})
+            metadata.append({'groupname':groupname, 'metadata':group})
+    # print(class_to_idx)
+    # print(metadata)
+    return metadata
 
 class CocoDetection(VisionDataset):
     """`MS Coco Detection <https://cocodataset.org/#detection-2016>`_ Dataset.
@@ -116,8 +216,7 @@ class CocoDetection(VisionDataset):
         print("is_mytar -> ", self.is_mytar)
         if hasattr(self, 'is_mytar') and self.is_mytar:
             print("Using Mytar...")
-
-            #self.metadata = get_metadata_mytar(root, self.group_size)
+            self.metadata = metadata = get_metadata_mytar(root, 4)
         else:
             print('test')
             self.coco = COCO(annFile)
@@ -135,6 +234,17 @@ class CocoDetection(VisionDataset):
         Returns:
             tuple: Tuple (image, target). target is the object returned by ``coco.loadAnns``.
         """
+        if self.is_mytar:
+            # metadata = get_metadata_mytar(root, 4)
+            path = root + '/' + str(group_size) + '/' + self.metadata[index]['groupname']
+            group_metadata = self.metadata[index]['metadata']
+            samples, targets = mytar_loader(path, group_metadata)
+            if self.transforms is not None:
+                samples, targets = self.transforms(samples, targets)
+
+            return samples, targets
+
+        
         coco = self.coco
         print("coco -> ", coco)
         img_id = self.ids[index]
@@ -148,11 +258,14 @@ class CocoDetection(VisionDataset):
 
         img = Image.open(os.path.join(self.root, path)).convert('RGB')
 
-        print("img, target ->", img, target)
+        print("img, target ->", img, target, type(img), type(target))
         if self.transforms is not None:
             img, target = self.transforms(img, target)
 
         return img, target
 
     def __len__(self) -> int:
-        return len(self.ids)
+        if self.is_mytar:
+            return len(self.metadata)
+        else:
+            return len(self.ids)
