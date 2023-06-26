@@ -6,7 +6,7 @@ from typing import Any, Callable, Optional, Tuple
 
 
 class CocoCaptions(VisionDataset):
-    """`MS Coco Captions <https://cocodataset.org/#captions-2015>`_ Dataset.
+    """`MS Coco Captions <https://cocod ataset.org/#captions-2015>`_ Dataset.
 
     Args:
         root (string): Root directory where images are downloaded to.
@@ -107,11 +107,25 @@ class CocoDetection(VisionDataset):
             transform: Optional[Callable] = None,
             target_transform: Optional[Callable] = None,
             transforms: Optional[Callable] = None,
+            is_mytar: bool = False,
     ) -> None:
         super(CocoDetection, self).__init__(root, transforms, transform, target_transform)
         from pycocotools.coco import COCO
-        self.coco = COCO(annFile)
-        self.ids = list(sorted(self.coco.imgs.keys()))
+
+        self.is_mytar = is_mytar
+        print("is_mytar -> ", self.is_mytar)
+        if hasattr(self, 'is_mytar') and self.is_mytar:
+            print("Using Mytar...")
+
+            #self.metadata = get_metadata_mytar(root, self.group_size)
+        else:
+            print('test')
+            self.coco = COCO(annFile)
+            print("self.coco -> ", self.coco)
+            self.ids = list(sorted(self.coco.imgs.keys()))
+            print("self.ids -> ", self.ids)
+
+        
 
     def __getitem__(self, index: int) -> Tuple[Any, Any]:
         """
@@ -122,13 +136,19 @@ class CocoDetection(VisionDataset):
             tuple: Tuple (image, target). target is the object returned by ``coco.loadAnns``.
         """
         coco = self.coco
+        print("coco -> ", coco)
         img_id = self.ids[index]
+        print("img_id -> ", img_id)
         ann_ids = coco.getAnnIds(imgIds=img_id)
+        print("ann_ids -> ", ann_ids)
         target = coco.loadAnns(ann_ids)
+        print("target -> ", target)
 
         path = coco.loadImgs(img_id)[0]['file_name']
 
         img = Image.open(os.path.join(self.root, path)).convert('RGB')
+
+        print("img, target ->", img, target)
         if self.transforms is not None:
             img, target = self.transforms(img, target)
 
