@@ -264,6 +264,6 @@ class ImageFolder(DatasetFolder):
         self.cache = cache
 
         if self.cache != None:
-            print("Using MinIO cache with size {} KB.".format(self.cache.get_size()))
+            print("Using MinIO cache with size {} KB.".format(self.cache.get_size() / 1024))
         else:
             print("NOT using MinIO cache.")
