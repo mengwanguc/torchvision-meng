@@ -250,9 +250,9 @@ class ImageFolder(DatasetFolder):
     def __init__(
             self,
             root: str,
-            cache: minio.PyCache = None,
             transform: Optional[Callable] = None,
             target_transform: Optional[Callable] = None,
+            cache: minio.PyCache = None,
             loader: Callable[[str], Any] = default_loader,
             is_valid_file: Optional[Callable[[str], bool]] = None,
     ):
