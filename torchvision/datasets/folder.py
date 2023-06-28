@@ -194,10 +194,12 @@ IMG_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.ppm', '.bmp', '.pgm', '.tif', '.tif
 
 
 def pil_loader(path: str, cache: minio.PyCache) -> Image.Image:
-    # Use MinIO cache to open the file.
-    data, _ = cache.read_file(path)
-    img = Image.open(io.BytesIO(data))
-    return img.convert('RGB')
+    # open path as file to avoid ResourceWarning (https://github.com/python-pillow/Pillow/issues/835)
+    with open(path, 'rb') as f:
+        f = f.read()
+        f = io.BytesIO(f)
+        img = Image.open(f)
+        return img.convert('RGB')
 
 
 # TODO: specify the return type
@@ -247,9 +249,8 @@ class ImageFolder(DatasetFolder):
 
     def __init__(
             self,
-            cache_size: int,                # Cache size in bytes.
-            cache_max_item_size: int,       # Max item size in bytes.
             root: str,
+            cache: minio.PyCache = None,
             transform: Optional[Callable] = None,
             target_transform: Optional[Callable] = None,
             loader: Callable[[str], Any] = default_loader,
@@ -260,5 +261,9 @@ class ImageFolder(DatasetFolder):
                                           target_transform=target_transform,
                                           is_valid_file=is_valid_file)
         self.imgs = self.samples
-        print("Creating MinIO cache with size {} KB and max file size {} KB".format(cache_size / 1024, cache_max_item_size / 1024))
-        self.cache = minio.PyCache(cache_size, cache_max_item_size)
+        self.cache = cache
+
+        if self.cache != None:
+            print("Using MinIO cache with size {} KB.".format(self.cache.get_size()))
+        else:
+            print("NOT using MinIO cache.")
