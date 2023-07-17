@@ -9,6 +9,8 @@ from typing import Any, Callable, cast, Dict, List, Optional, Tuple
 
 import minio
 
+import io
+
 
 def has_file_allowed_extension(filename: str, extensions: Tuple[str, ...]) -> bool:
     """Checks if a file is an allowed extension.
@@ -33,6 +35,43 @@ def is_image_file(filename: str) -> bool:
         bool: True if the filename ends with a known image extension
     """
     return has_file_allowed_extension(filename, IMG_EXTENSIONS)
+
+# meng: get metadata for mytar files, so that we know the classes and index of images.
+def get_metadata_mytar(
+    directory: str,
+    group_size: int
+):
+    directory = os.path.expanduser(directory)
+    metadata_path = os.path.join(directory, "metadata.txt")
+    metadata = []
+    classes = []
+    with open(metadata_path, 'r') as reader:
+        # first get all classes
+        class_count = int(reader.readline().strip())
+        for _ in range(class_count):
+            class_name = reader.readline().strip()
+            classes.append(class_name)
+        classes.sort()
+        class_to_idx = {cls_name: i for i, cls_name in enumerate(classes)} 
+        print(class_to_idx)
+        # then get all groups metadata
+        while reader:
+            groupname = reader.readline().strip().split(',')[0]
+            if(groupname == ''):
+                break
+            group = []
+            for i in range(group_size):
+                values = reader.readline().strip().split(',')
+                idx = values[0]
+                img_class = values[1]
+                start = int(values[2])
+                img_size = int(values[3])
+                img_class_idx = class_to_idx[img_class]
+                group.append({'idx':idx, 'img_class':img_class, 'img_class_idx':img_class_idx, 'start':start, 'img_size':img_size})
+            metadata.append({'groupname':groupname, 'metadata':group})
+    print(class_to_idx)
+    return metadata
+
 
 
 def make_dataset(
@@ -126,21 +165,26 @@ class DatasetFolder(VisionDataset):
     ) -> None:
         super(DatasetFolder, self).__init__(root, transform=transform,
                                             target_transform=target_transform)
-        classes, class_to_idx = self._find_classes(self.root)
-        samples = self.make_dataset(self.root, class_to_idx, extensions, is_valid_file)
-        if len(samples) == 0:
-            msg = "Found 0 files in subfolders of: {}\n".format(self.root)
-            if extensions is not None:
-                msg += "Supported extensions are: {}".format(",".join(extensions))
-            raise RuntimeError(msg)
+        if hasattr(self, 'use_file_group') and self.use_file_group:
+            self.metadata = get_metadata_mytar(root, self.group_size)
+        else:
+            classes, class_to_idx = self._find_classes(self.root)
+            samples = self.make_dataset(self.root, class_to_idx, extensions, is_valid_file)
+            if len(samples) == 0:
+                msg = "Found 0 files in subfolders of: {}\n".format(self.root)
+                if extensions is not None:
+                    msg += "Supported extensions are: {}".format(",".join(extensions))
+                raise RuntimeError(msg)
+            
+            self.classes = classes
+            self.class_to_idx = class_to_idx
+            self.samples = samples
+            self.targets = [s[1] for s in samples]
 
         self.loader = loader
         self.extensions = extensions
 
-        self.classes = classes
-        self.class_to_idx = class_to_idx
-        self.samples = samples
-        self.targets = [s[1] for s in samples]
+        
 
     @staticmethod
     def make_dataset(
@@ -177,6 +221,18 @@ class DatasetFolder(VisionDataset):
         Returns:
             tuple: (sample, target) where target is class_index of the target class.
         """
+        if self.use_file_group:
+            path = self.root + '/' + self.metadata[index]['groupname']
+            group_metadata = self.metadata[index]['metadata']
+            samples, targets = mytar_loader(path, group_metadata)
+            if self.transform is not None:
+                samples = [self.transform(sample) for sample in samples]
+            if self.target_transform is not None:
+                # print("\n\nself.target_transform.....\n\n")
+                targets = [self.target_transform(target) for target in targets]
+            res = samples, targets
+            return res
+
         path, target = self.samples[index]
         sample = self.loader(path, self.cache)
         if self.transform is not None:
@@ -187,10 +243,14 @@ class DatasetFolder(VisionDataset):
         return sample, target
 
     def __len__(self) -> int:
-        return len(self.samples)
+        if self.use_file_group:
+            return len(self.metadata)
+        else:
+            return len(self.samples)
 
 
-IMG_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.ppm', '.bmp', '.pgm', '.tif', '.tiff', '.webp')
+IMG_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.ppm', '.bmp', '.pgm', '.tif', '.tiff', '.webp',
+                    '.pickle', '.zip', 'tar', 'mytar')
 
 
 def pil_loader(path: str, cache: minio.PyCache) -> Image.Image:
@@ -200,6 +260,26 @@ def pil_loader(path: str, cache: minio.PyCache) -> Image.Image:
         f = io.BytesIO(f)
         img = Image.open(f)
         return img.convert('RGB')
+
+
+def mytar_loader(path: str, group_metadata):
+    imgs = []
+    targets = []
+    with open(path, 'rb') as f:
+        f = f.read()
+        for img_info in group_metadata:
+                img_start = img_info['start']
+                img_end = img_start + img_info['img_size']
+                img_class_idx = img_info['img_class_idx']
+
+                # print('img_class_idx:{}'.format(img_class_idx))
+                img_data = f[img_start:img_end]
+                iobytes = io.BytesIO(img_data)
+
+                img = Image.open(iobytes)
+                imgs.append(img.convert('RGB'))
+                targets.append(img_class_idx)
+    return imgs, targets
 
 
 # TODO: specify the return type
@@ -255,12 +335,17 @@ class ImageFolder(DatasetFolder):
             cache: minio.PyCache = None,
             loader: Callable[[str], Any] = default_loader,
             is_valid_file: Optional[Callable[[str], bool]] = None,
+            use_file_group: bool = False,
+            group_size: int = 1,
     ):
+        self.use_file_group = use_file_group
+        self.group_size = group_size
         super(ImageFolder, self).__init__(root, loader, IMG_EXTENSIONS if is_valid_file is None else None,
                                           transform=transform,
                                           target_transform=target_transform,
                                           is_valid_file=is_valid_file)
-        self.imgs = self.samples
+        if not self.use_file_group:
+            self.imgs = self.samples
         self.cache = cache
 
         if self.cache != None:
