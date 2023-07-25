@@ -8,6 +8,7 @@ import os.path
 from typing import Any, Callable, cast, Dict, List, Optional, Tuple
 
 import minio
+import AsyncLoader as al
 
 
 def has_file_allowed_extension(filename: str, extensions: Tuple[str, ...]) -> bool:
@@ -253,6 +254,7 @@ class ImageFolder(DatasetFolder):
             transform: Optional[Callable] = None,
             target_transform: Optional[Callable] = None,
             cache: minio.PyCache = None,
+            async_loader: al.Loader = None,
             loader: Callable[[str], Any] = default_loader,
             is_valid_file: Optional[Callable[[str], bool]] = None,
     ):
@@ -262,6 +264,7 @@ class ImageFolder(DatasetFolder):
                                           is_valid_file=is_valid_file)
         self.imgs = self.samples
         self.cache = cache
+        self.async_loader = async_loader
 
         if self.cache != None:
             print("Using MinIO cache with size {} KB.".format(self.cache.get_size() / 1024))
