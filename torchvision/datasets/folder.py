@@ -253,8 +253,8 @@ class ImageFolder(DatasetFolder):
             root: str,
             transform: Optional[Callable] = None,
             target_transform: Optional[Callable] = None,
-            cache: minio.PyCache = None,
             async_loader: al.Loader = None,
+            load_indices: Optional[Callable] = None,
             loader: Callable[[str], Any] = default_loader,
             is_valid_file: Optional[Callable[[str], bool]] = None,
     ):
@@ -263,7 +263,7 @@ class ImageFolder(DatasetFolder):
                                           target_transform=target_transform,
                                           is_valid_file=is_valid_file)
         self.imgs = self.samples
-        self.cache = cache
+        self.load_indices = load_indices
         self.async_loader = async_loader
 
         if self.cache != None:
