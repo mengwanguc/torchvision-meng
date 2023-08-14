@@ -3,7 +3,7 @@ from torch import Tensor
 import torch.nn as nn
 from .utils import load_state_dict_from_url
 from typing import Type, Any, Callable, Union, List, Optional
-
+import time
 
 __all__ = ['ResNet', 'resnet18', 'resnet34', 'resnet50', 'resnet101',
            'resnet152', 'resnext50_32x4d', 'resnext101_32x8d',
@@ -229,23 +229,81 @@ class ResNet(nn.Module):
 
     def _forward_impl(self, x: Tensor) -> Tensor:
         # See note [TorchScript super()]
+        
+        torch.cuda.synchronize()
+        time_now = time.time()
+        torch.cuda.synchronize()
+        # 1st find out which one of the 4 functions contribute to the difference. 
+        # 
+        # Part A
+        torch.cuda.synchronize()
+        time_bef_a = time.time()
+        torch.cuda.synchronize()
         x = self.conv1(x)
+        torch.cuda.synchronize()
+        time_conv1 = time.time()
+        torch.cuda.synchronize()
+        
         x = self.bn1(x)
+        torch.cuda.synchronize()
+        time_bn1 = time.time()
+        torch.cuda.synchronize()
+        
         x = self.relu(x)
+        torch.cuda.synchronize()
+        time_relu = time.time()
+        torch.cuda.synchronize()
+        
         x = self.maxpool(x)
-
+        torch.cuda.synchronize()
+        time_aft_a = time.time()
+        torch.cuda.synchronize()
+        
+        # check the sum, see if it makes sense. 
+        # Part B
+        torch.cuda.synchronize()
+        time_bef_b = time.time()
+        torch.cuda.synchronize()
         x = self.layer1(x)
         x = self.layer2(x)
         x = self.layer3(x)
         x = self.layer4(x)
+        torch.cuda.synchronize()
+        time_aft_b = time.time()
+        torch.cuda.synchronize()
+        
 
+        # Part C
+        torch.cuda.synchronize()
+        time_bef_c = time.time()
+        torch.cuda.synchronize()
         x = self.avgpool(x)
         x = torch.flatten(x, 1)
         x = self.fc(x)
+        torch.cuda.synchronize()
+        time_aft_c = time.time()
+        torch.cuda.synchronize()
+        
 
+        torch.cuda.synchronize()
+        time_end = time.time()
+        torch.cuda.synchronize()
+        time_inside = time_end-time_now
+        print("_forward_impl! ! ! ! ! ! ! ! ! ! ")
+        print('Got into _forward_impl in resnet.py.')
+        print("Time spent in conv1 is: {}".format(time_conv1-time_bef_a))
+        print("Time spent in bn1 is: {}".format(time_bn1-time_conv1))
+        print("Time spent in relu is: {}".format(time_relu-time_bn1))
+        print("Time spent in maxpool is: {}".format(time_aft_a-time_relu))
+        print("Time spent in A is: {}".format(time_aft_a-time_bef_a))
+        print("Time spent in B is: {}".format(time_aft_b-time_bef_b))
+        print("Time spent in C is: {}".format(time_aft_c-time_bef_c))
+        print('Time spent in _forward_impl was ',time_inside)
+        print('Getting out of _forward_impl in resnet.py')
         return x
 
     def forward(self, x: Tensor) -> Tensor:
+        print("forward! ! ! ! ! ! ! ! ! ! ")
         return self._forward_impl(x)
 
 
