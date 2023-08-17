@@ -254,7 +254,8 @@ class ImageFolder(DatasetFolder):
             transform: Optional[Callable] = None,
             target_transform: Optional[Callable] = None,
             async_loader: al.Loader = None,
-            load_indices: Optional[Callable] = None,
+            load_indices_front: Optional[Callable] = None,
+            load_indices_back: Optional[Callable] = None,
             loader: Callable[[str], Any] = default_loader,
             is_valid_file: Optional[Callable[[str], bool]] = None,
     ):
@@ -263,5 +264,6 @@ class ImageFolder(DatasetFolder):
                                           target_transform=target_transform,
                                           is_valid_file=is_valid_file)
         self.imgs = self.samples
-        self.load_indices = load_indices
+        self.load_indices_front = load_indices_front
+        self.load_indices_back = load_indices_back
         self.async_loader = async_loader
