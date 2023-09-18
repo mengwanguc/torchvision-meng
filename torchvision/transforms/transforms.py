@@ -218,8 +218,20 @@ class Normalize(torch.nn.Module):
         Returns:
             Tensor: Normalized Tensor image.
         """
-        return F.normalize(tensor, self.mean, self.std, self.inplace)
+        # torch.cuda.synchronize()
+        # start = time.time()
+        # x = F.normalize(tensor, self.mean, self.std, self.inplace)
+        # print("normalize ->",x, type(x), x.size())
+        
+        # torch.cuda.synchronize()
+        # end = time.time() - start
+        # with open("normalize.txt", 'a') as f:
+        #     f.write("{:.9f}\n".format(end))
 
+        time.sleep(0.007781332)
+
+        return torch.empty(256, 3, 224, 224)
+        
     def __repr__(self):
         return self.__class__.__name__ + '(mean={0}, std={1})'.format(self.mean, self.std)
 
