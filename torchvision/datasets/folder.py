@@ -9,6 +9,7 @@ from typing import Any, Callable, cast, Dict, List, Optional, Tuple
 
 import minio
 import AsyncLoader as al
+import ladcache as lc
 
 
 def has_file_allowed_extension(filename: str, extensions: Tuple[str, ...]) -> bool:
@@ -253,9 +254,9 @@ class ImageFolder(DatasetFolder):
             root: str,
             transform: Optional[Callable] = None,
             target_transform: Optional[Callable] = None,
+            ladcache: lc.Cache = None,
             async_loader: al.Loader = None,
-            load_indices_front: Optional[Callable] = None,
-            load_indices_back: Optional[Callable] = None,
+            load_indices: Optional[Callable] = None,
             loader: Callable[[str], Any] = default_loader,
             is_valid_file: Optional[Callable[[str], bool]] = None,
     ):
@@ -264,6 +265,6 @@ class ImageFolder(DatasetFolder):
                                           target_transform=target_transform,
                                           is_valid_file=is_valid_file)
         self.imgs = self.samples
-        self.load_indices_front = load_indices_front
-        self.load_indices_back = load_indices_back
+        self.load_indices = load_indices
+        self.ladcache = ladcache
         self.async_loader = async_loader
