@@ -7,6 +7,7 @@ import os.path
 from typing import Any, Callable, cast, Dict, List, Optional, Tuple
 import sys, time
 from pympler import asizeof
+import torch
 
 
 def get_size(obj, seen=None):
@@ -161,6 +162,9 @@ class DatasetFolder(VisionDataset):
         self.samples = samples
         self.targets = [s[1] for s in samples]
 
+        self.sizes = {"-1": -1}
+        self.times = {"-1": -1}
+
     @staticmethod
     def make_dataset(
         directory: str,
@@ -197,29 +201,60 @@ class DatasetFolder(VisionDataset):
             tuple: (sample, target) where target is class_index of the target class.
         """
         path, target = self.samples[index]
-        sample = self.loader(path)
-        sizes = {}
-        filesize = os.path.getsize(path)
-        sizes['filesize'] = filesize
 
-        sizes['after decoding'] = sys.getsizeof(sample.tobytes())
+        loader_start = time.time()
+        sample = self.loader(path)
+        loader_end = time.time()
+        loader_time = loader_end - loader_start
+        # print(f"loader time: {loader_time}")
+
+        sizes = {}
+        times = {}
+
+        # sizes["index"] = index
+        times["loader"] = loader_time
+
+        filesize = os.path.getsize(path)
+        sizes['size raw'] = filesize
+
+        # decode_tobytes_start = time.time()
+        sizes['size after decoding'] = sys.getsizeof(sample.tobytes())
+        # decode_tobytes_end = time.time()
+        # decode_tobytes_time = decode_tobytes_end - decode_tobytes_start
+        # print(f"decode tobytes time: {decode_tobytes_time}")
+
         sizes['original shape'] = sample.size
 
         if self.transform is not None:
             # sample = self.transform(sample)
             compose = self.transform
             for t in compose.transforms:
+
+                transform_start = time.time()
                 sample = t(sample)
+                transform_end = time.time()
+                transform_time = transform_end - transform_start
+                times["{}".format(type(t).__name__)] = transform_time
+
                 # print(sample)
-                if hasattr(sample, 'im'):
-                    sizes['after {}'.format(t)] = sys.getsizeof(sample.tobytes())
-                else:
-                    sizes['after {}'.format(t)] = sample.nelement() * sample.element_size()
+                if torch.is_tensor(sample):
+                    # sizes['after {}'.format(t)] = sample.nelement() * sample.element_size()
+                    # tensor_numpy_tobytes_start = time.time()
+                    sizes['size after {} numpy tobytes'.format(type(t).__name__)] = sys.getsizeof(sample.numpy().tobytes())
+                    # tensor_numpy_tobytes_end = time.time()
+                    # print("tensor_numpy_tobytes_time: {}".format(tensor_numpy_tobytes_end - tensor_numpy_tobytes_start))
                     # print(list(sample.getdata()))
+                else:
+                    sizes['size after {}'.format(type(t).__name__)] = sys.getsizeof(sample.tobytes())
+                    
         if self.target_transform is not None:
             target = self.target_transform(target)
         
-        print(sizes)
+        self.times[index] = times
+        self.sizes[index] = sizes
+
+        # print("{}: {}".format(index, times))
+        # print(self.times)
 
         return sample, target
 
