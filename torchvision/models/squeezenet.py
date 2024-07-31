@@ -113,7 +113,7 @@ class SqueezeNet(nn.Module):
         x = self.classifier(x)
         res = torch.flatten(x, 1)
         single_forward_time = time.time() - end
-        print("squeezenet single_forward_time: {}".format(single_forward_time))
+        # print("squeezenet single_forward_time: {}".format(single_forward_time))
         return res
 
 def _squeezenet(version: str, pretrained: bool, progress: bool, **kwargs: Any) -> SqueezeNet:

@@ -98,7 +98,7 @@ class _DenseLayer(nn.Module):
             new_features = F.dropout(new_features, p=self.drop_rate,
                                      training=self.training)
         single_forward_time = time.time() - end
-        print("densenet single_forward_time: {}".format(single_forward_time))
+        # print("densenet single_forward_time: {}".format(single_forward_time))
         return new_features
 
 
