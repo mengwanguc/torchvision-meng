@@ -54,7 +54,7 @@ class AlexNet(nn.Module):
         x = self.classifier(x)
         single_forward_time = time.time() - end
         self.forward_time += single_forward_time
-        print("alexnet self forward time: {}".format(self.forward_time))
+        # print("alexnet self forward time: {}".format(self.forward_time))
         # print("alexnet single_forward_time: {}".format(single_forward_time))
         return x
 
